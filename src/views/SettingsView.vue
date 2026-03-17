@@ -43,7 +43,7 @@
         <h3 class="card-title">PM TOOL</h3>
         <div class="field">
           <label class="field-label">PM Tool URL</label>
-          <input v-model="draft.pmToolUrl" class="field-input glass-input" type="text" placeholder="http://localhost:4173" />
+          <input v-model="draft.pmToolUrl" class="field-input glass-input" type="text" placeholder="http://100.115.61.30:8000" />
         </div>
         <div class="field">
           <label class="field-label">Poll Interval (seconds)</label>

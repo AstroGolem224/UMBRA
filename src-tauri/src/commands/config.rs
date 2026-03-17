@@ -69,7 +69,7 @@ fn default_vault_path() -> String {
     r"D:\Obsidian\2nd-brain\2nd-brain".into()
 }
 fn default_notes_subdir() -> String { "UMBRA_Notes".into() }
-fn default_pm_url() -> String { "http://localhost:4173".into() }
+fn default_pm_url() -> String { "http://100.115.61.30:8000".into() }
 fn default_poll_seconds() -> u64 { 30 }
 
 impl Default for AppConfig {
