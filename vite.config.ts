@@ -3,6 +3,17 @@ import vue from "@vitejs/plugin-vue";
 import path from "path";
 
 const host = process.env.TAURI_DEV_HOST;
+const isTauriDev = Boolean(process.env.TAURI_ENV_TARGET_TRIPLE);
+
+// When running Vite standalone (browser preview), shim Tauri IPC modules
+const tauriMock = path.resolve(__dirname, "./src/lib/tauri-mock.ts");
+const tauriAliases = isTauriDev
+  ? {}
+  : {
+      "@tauri-apps/api/core": tauriMock,
+      "@tauri-apps/api/event": tauriMock,
+      "@tauri-apps/api/window": tauriMock,
+    };
 
 export default defineConfig({
   plugins: [vue()],
@@ -10,6 +21,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      ...tauriAliases,
     },
   },
   test: {

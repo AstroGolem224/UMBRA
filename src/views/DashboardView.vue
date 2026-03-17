@@ -63,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-
+import { onMounted } from "vue";
 import { useAgentStore } from "@/stores/useAgentStore";
 import { useNotesStore } from "@/stores/useNotesStore";
 import { useTaskStore } from "@/stores/useTaskStore";
@@ -76,6 +76,11 @@ const agentStore = useAgentStore();
 const notesStore = useNotesStore();
 const taskStore = useTaskStore();
 const configStore = useConfigStore();
+
+onMounted(() => {
+  agentStore.loadAgents();
+  notesStore.loadNotes();
+});
 
 const noteCategories: NoteCategory[] = ["prompts", "cli", "agents", "skills", "misc"];
 

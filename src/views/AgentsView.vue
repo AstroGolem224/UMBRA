@@ -54,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { useAgentStore } from "@/stores/useAgentStore";
 import AgentCard from "@/components/agents/AgentCard.vue";
 import StatusBadge from "@/components/ui/StatusBadge.vue";
@@ -63,6 +63,11 @@ import type { Agent } from "@/interfaces";
 const agentStore = useAgentStore();
 const selectedAgent = ref<Agent | null>(null);
 const onlineCount = computed(() => agentStore.agents.filter((a) => a.status === "online").length);
+
+onMounted(() => {
+  agentStore.loadAgents();
+  agentStore.setupLiveUpdates();
+});
 </script>
 
 <style scoped>

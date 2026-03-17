@@ -27,7 +27,7 @@ import { useAgentStore } from "@/stores/useAgentStore";
 const route = useRoute();
 const agentStore = useAgentStore();
 
-const backendConnected = computed(() => agentStore.agents.length > 0 || !agentStore.loading);
+const backendConnected = computed(() => (agentStore.agents?.length ?? 0) > 0 || !agentStore.loading);
 
 function isActive(path: string) {
   return route.path.startsWith(path);

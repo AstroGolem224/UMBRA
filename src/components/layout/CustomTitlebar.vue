@@ -13,23 +13,25 @@
 </template>
 
 <script setup lang="ts">
-import { getCurrentWindow } from "@tauri-apps/api/window";
+// getCurrentWindow() only works inside Tauri — guard for browser dev preview
+const isTauri = Boolean((window as any).__TAURI_INTERNALS__);
 
-const win = getCurrentWindow();
-
-function minimize() {
-  win.minimize();
+async function minimize() {
+  if (!isTauri) return;
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  await getCurrentWindow().minimize();
 }
 async function toggleMaximize() {
+  if (!isTauri) return;
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  const win = getCurrentWindow();
   const maximized = await win.isMaximized();
-  if (maximized) {
-    win.unmaximize();
-  } else {
-    win.maximize();
-  }
+  if (maximized) win.unmaximize(); else win.maximize();
 }
-function closeWindow() {
-  win.close();
+async function closeWindow() {
+  if (!isTauri) return;
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  await getCurrentWindow().close();
 }
 </script>
 
