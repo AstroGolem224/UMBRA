@@ -1,0 +1,40 @@
+[package]
+name = "umbra"
+version = "0.1.0"
+description = "UMBRA — Unified Management Board for Runtimes & Agents"
+authors = ["AstroGolem224"]
+edition = "2021"
+
+[lib]
+name = "umbra_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[[bin]]
+name = "umbra"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-shell = "2"
+tauri-plugin-window-state = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tokio-cron-scheduler = "0.13"
+reqwest = { version = "0.12", features = ["json"] }
+thiserror = "2"
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+[package.metadata.tauri-build]
+# required by tauri-build
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true

@@ -1,0 +1,76 @@
+.neon-text {
+  color: var(--accent);
+  text-shadow: var(--glow-neon);
+}
+
+.neon-border {
+  border-color: var(--accent) !important;
+  box-shadow: var(--glow-neon);
+}
+
+.neon-btn {
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-family: "Iceland", monospace;
+  font-size: 13px;
+  padding: 6px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.05em;
+}
+
+.neon-btn:hover {
+  background: var(--accent-dim);
+  box-shadow: var(--glow-neon);
+}
+
+.neon-btn:active {
+  transform: scale(0.97);
+}
+
+.neon-btn.ember {
+  border-color: var(--accent-ember);
+  color: var(--accent-ember);
+}
+
+.neon-btn.ember:hover {
+  background: var(--accent-ember-dim);
+  box-shadow: var(--glow-ember);
+}
+
+/* Status badge pulse animations */
+@keyframes pulse-working {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+@keyframes pulse-idle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.pulse-working {
+  animation: pulse-working 0.8s ease-in-out infinite;
+}
+
+.pulse-idle {
+  animation: pulse-idle 3s ease-in-out infinite;
+}
+
+/* Scan-line overlay (optional, on .scanlines parent) */
+.scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.05) 2px,
+    rgba(0, 0, 0, 0.05) 4px
+  );
+  pointer-events: none;
+  z-index: 1;
+}
