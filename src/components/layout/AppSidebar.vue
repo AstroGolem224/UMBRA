@@ -43,6 +43,7 @@ const navItems = computed(() => [
   { path: "/cron",      icon: "⏱", label: "CRON" },
   { path: "/notes",     icon: "◎", label: "NOTES" },
   { path: "/launcher",  icon: "▶", label: "LAUNCHER" },
+  { path: "/plugins",   icon: "⊞", label: "PLUGINS" },
   { path: "/skills",    icon: "⚡", label: "SKILLS" },
   { path: "/settings",  icon: "⚙", label: "SETTINGS" },
 ]);
