@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 use tokio::fs;
 
-use crate::errors::{AppError, Result};
+use crate::errors::AppError;
 use crate::state::AppState;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
