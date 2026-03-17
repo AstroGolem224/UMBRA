@@ -1,171 +1,500 @@
-# Software-Architektur-Dokument: UMBRA (Unified Management Board for Runtimes & Agents)
+# UMBRA — Software-Architektur-Dokument v2
+*Unified Management Board for Runtimes & Agents*
+
+> "Der Schatten der alles zusammenhält."
+> Version 2.0 — 2026-03-17 — Stack-Entscheidung: Tauri 2
+
+---
 
 ## 1. Executive Summary
-UMBRA ist die zentrale, unsichtbare Schaltzentrale ("Schatten-Interface") für das KI-Agenten-Ökosystem von Clay Machine Games (CMG), entwickelt unter dem Leitmotiv: *"Der Schatten, der alles zusammenhält"* [1]. Das System aggregiert und orchestriert sämtliche Runtimes, Agents (wie Prism, Forge und Jim), Skills und lokalen Tools in einem einheitlichen Dashboard [1, 2]. Es liefert dem Nutzer die vollständige operative Kontrolle über verteilte Entwicklungsprozesse, indem es Projektstände, Werkzeugzugriffe und Agenten-Status in einer hochperformanten Kommandozentrale vereint [2].
 
-## 2. System-Kontext
-UMBRA agiert als Aggregator und Orchestrator inmitten eines stark verteilten, heterogenen Tool-Ökosystems [3]. 
+UMBRA ist die native Desktop-Schaltzentrale für CMG's AI-Agent-Ökosystem auf Windows 11. Es orchestriert Prism, Forge und Jim in einem einzigen, permanenten Interface: Agent-Status, Notes, Cronjobs, IDE-Launch und GitHub-Integration — alles in einer Cyberpunk-UI die sich am PRISM Hub Brand Bible orientiert.
+
+**Tech Stack:** Tauri 2 + Rust + Vue 3 + TypeScript + TailwindCSS
+**Primäre Zielplattform:** Windows 11 (native Desktop App via WebView2)
+
+---
+
+## 2. Tech-Stack-Entscheidung
+
+### Gewählt: Tauri 2 + Rust + Vue 3
+
+| Option | RAM | OS-Zugriff | Startup | Verdict |
+|--------|-----|-----------|---------|---------|
+| **Tauri 2 + Rust** | ~30 MB | Voll (Rust) | < 1s | **Gewählt** |
+| Electron + Node | ~200 MB | Eingeschränkt | 2-5s | Abgelehnt (Bloat) |
+| Lokale Web-App | n/a | Kein | n/a | Abgelehnt (kein nativer Feel) |
+
+**Begründung:**
+1. **Ökosystem-Konsistenz** — `popup-bar` nutzt bereits Tauri 2. Rust-Module sind wiederverwendbar.
+2. **Windows 11 Mica-Effekt** — Tauri erlaubt transparente/transluzente App-Windows (rahmenlos, Custom Titlebar) — perfekt für Glassmorphism.
+3. **Native OS-Integration** — IDE-Launch, GitHub Desktop URI, Cronjobs via `tokio` — alles in Rust, sicher und performant.
+4. **Kein separater Backend-Prozess** — Der FastAPI-Ansatz aus v1 entfällt. Rust erledigt alles (File I/O, HTTP, Shell).
+
+---
+
+## 3. System-Kontext
 
 ```mermaid
 C4Context
-    title System Context Diagram: UMBRA Ecosystem
-    Person(druid, "Druid (AstroGolem224)", "Owner & Lead Architect")
-    System_Boundary(umbra_boundary, "UMBRA") {
-        System(umbra, "UMBRA Dashboard & Core", "Zentrale Schaltzentrale")
+    title UMBRA v2 — System Context (Tauri 2 Desktop App)
+    Person(druid, "Druid", "Owner")
+    System_Boundary(umbra, "UMBRA (Tauri 2 Desktop App)") {
+        System(frontend, "Vue 3 Frontend", "UI Layer (WebView2)")
+        System(rust, "Rust Core", "Commands, Cron, FS, Shell")
     }
-    
-    System_Ext(prism_hub, "PRISM Hub", "Knowledge Base (Vue/TS)")
-    System_Ext(pm_tool, "CMG PM Tool", "Task Management (Vue 3)")
-    System_Ext(tm_lite, "TM-lite MCP", "Node.js MCP Server")
-    System_Ext(sound_forge, "Sound Forge", "Audio-Tool (FastAPI)")
-    System_Ext(github, "GitHub API", "Repo/PR/Issue Status")
-    System_Ext(obsidian, "Obsidian Vault", "Local Markdown Files")
-    System_Ext(ide, "IDE (VSCode/Godot)", "Lokale Entwicklungsumgebungen")
+    System_Ext(obsidian, "Obsidian Vault", "D:\\Obsidian\\... (lokale MD-Dateien)")
+    System_Ext(pm_tool, "CMG PM Tool", "http://localhost:4173")
+    System_Ext(github, "GitHub API + Desktop", "REST API + URI Scheme")
+    System_Ext(ide, "VSCode / Godot", "Windows Shell")
+    System_Ext(tmlite, "TM-lite MCP", "Node.js MCP Server")
 
-    Rel(druid, umbra, "Überwacht & steuert Agents via")
-    Rel(umbra, pm_tool, "Liest/Schreibt Tasks", "REST (Polling)")
-    Rel(umbra, github, "Fetch Repos/PRs", "REST/GraphQL")
-    Rel(umbra, tm_lite, "Liest/Schreibt Obsidian Tasks", "MCP")
-    Rel(umbra, sound_forge, "Liest Status", "REST/WS")
-    Rel(umbra, obsidian, "Vault Zugriff", "REST HTTPS")
-    Rel(umbra, ide, "Startet Projekte", "Shell Execute")
-    Rel(umbra, prism_hub, "Teilt Design-System & UI Patterns")
+    Rel(druid, frontend, "interagiert via")
+    Rel(frontend, rust, "Tauri IPC Commands/Events")
+    Rel(rust, obsidian, "FS read/write (Notes + Vault Sync)")
+    Rel(rust, pm_tool, "HTTP Polling (reqwest)")
+    Rel(rust, github, "REST API (reqwest) + shell::open")
+    Rel(rust, ide, "subprocess (std::process::Command)")
+    Rel(rust, tmlite, "JSON-RPC (MCP)")
 ```
 
-UMBRA muss nahtlos mit lokalen Services (z.B. PM Tool auf `localhost:4173`, Obsidian API auf `localhost:27124`) sowie externen APIs (GitHub) kommunizieren und als Brücke zwischen den Agenten und diesen Tools fungieren [4, 5].
+---
 
-## 3. Tech-Stack-Entscheidung
-Aus den evaluierten Optionen wird **Option A (Vue-First) in Kombination mit einem FastAPI-Backend** als Architektur-Standard festgelegt [6].
+## 4. Verzeichnisstruktur
 
-**Gewählter Stack:**
-*   **Frontend:** Vue 3 + Vite + TypeScript + TailwindCSS
-*   **Backend:** FastAPI + Python 3.14 + WebSockets
-
-**Begründung:**
-1.  **Ökosystem-Konsistenz:** Die bestehenden Kernsysteme (PRISM Hub, CMG PM Tool) basieren bereits auf Vue 3 und TypeScript [3]. Dies minimiert den kognitiven Overhead, ermöglicht das Teilen von UI-Komponenten und garantiert eine einheitliche UX [3, 6].
-2.  **Performance & Concurrency:** FastAPI (Python 3.14) ist extrem schnell und unterstützt nativ asynchrone I/O-Operationen und WebSockets [6]. Da wir strikte NFRs haben (< 500ms für Status-Updates), ist FastAPI ideal für das parallele Abrufen von Polling-Daten und das Pushen an den Client [7].
-3.  **Zugänglichkeit (Remote-Fähigkeit):** Im Gegensatz zu einer reinen Desktop-App (Tauri/Electron) ermöglicht eine Web-Architektur (Client/Server) den sofortigen "Remote-Zugriff" im lokalen Netzwerk (`192.168.137.x`) von jedem Endgerät aus [6, 8]. OS-Level Befehle (wie das Starten von IDEs) werden sicher und isoliert vom FastAPI-Backend über `subprocess` auf Windows 11 ausgeführt [5, 6].
-
-## 4. Frontend-Architektur
-Das Frontend folgt dem **PRISM Hub Brand Bible**-Standard: Ein Dark-first Cyberpunk-Terminal-Style mit Glassmorphism, Neon-Buttons und der Typografie "Iceland-Regular.ttf" [9].
-
-**Struktur & State Management:**
-*   **Routing (Vue Router):** Modulare Views (`/dashboard`, `/agents`, `/skills`, `/projects`, `/settings`).
-*   **State (Pinia):** Zentralisierte Stores für reaktive Daten.
-    *   `useAgentStore`: Verwaltet Live-Status der Agents (Prism, Forge, Jim) [2].
-    *   `useTaskStore`: Synchronisiert Tasks aus dem PM Tool und TM-lite [4, 5].
-    *   `usePluginStore`: Verwaltet den Laufzeit-Status der UI-Widgets [10].
-
-```mermaid
-graph TD
-    A[App.vue] --> B[Layout: Glassmorphism Shell]
-    B --> C[Sidebar Navigation]
-    B --> D[Router View]
-    D --> E[Dashboard View]
-    D --> F[Agent Overview View]
-    D --> G[Skills Browser View]
-    E --> H[Widget: Active Agents]
-    E --> I[Widget: PM Tool Tasks]
-    E --> J[Widget: IDE Launcher]
-    
-    K[(Pinia Stores)] -.-> H
-    K -.-> I
-    K -.-> F
-    K -.-> G
+```
+umbra/
+├── src-tauri/                    # Rust Backend (Tauri Core)
+│   ├── src/
+│   │   ├── main.rs               # Entry Point, Tauri Builder, Window Setup
+│   │   ├── commands/             # Tauri #[tauri::command] Handler
+│   │   │   ├── agents.rs         # Agent-Status lesen/setzen
+│   │   │   ├── notes.rs          # Notes CRUD (Markdown-Dateien)
+│   │   │   ├── cron.rs           # Cronjob-Manager
+│   │   │   ├── launcher.rs       # IDE + GitHub Desktop Launcher
+│   │   │   └── integrations.rs   # PM Tool, GitHub API
+│   │   ├── cron/
+│   │   │   └── scheduler.rs      # tokio-cron-scheduler Wrapper
+│   │   └── models.rs             # Rust Structs (Agent, Note, CronJob)
+│   ├── Cargo.toml
+│   └── tauri.conf.json           # Window: frameless, transparent, 1400x900
+├── src/                          # Vue 3 Frontend
+│   ├── assets/
+│   │   ├── fonts/                # Iceland-Regular.ttf, RubikIso-Regular.ttf
+│   │   └── styles/
+│   │       ├── base.css          # CSS Custom Properties, Dark Theme
+│   │       ├── glassmorphism.css # .glass-card, .glass-panel
+│   │       └── neon.css          # .neon-text, .neon-border, .glow-*
+│   ├── components/
+│   │   ├── ui/                   # Basis-Komponenten (NeonButton, GlassCard, Badge)
+│   │   ├── layout/               # AppLayout, AppSidebar, CustomTitlebar
+│   │   ├── agents/               # AgentCard, AgentStatusBadge
+│   │   ├── notes/                # NoteEditor (Split-View), NoteList, NoteFilter
+│   │   ├── cron/                 # CronJobList, CronJobEditor
+│   │   └── launcher/             # IDELauncher, GitHubLauncher
+│   ├── stores/
+│   │   ├── useAgentStore.ts      # Live Agent-Status
+│   │   ├── useNotesStore.ts      # Notes CRUD + Kategorien
+│   │   ├── useCronStore.ts       # Cronjobs State
+│   │   └── useTaskStore.ts       # PM Tool Tasks
+│   ├── views/
+│   │   ├── DashboardView.vue     # Übersicht: Agents + Tasks + Quick-Launch
+│   │   ├── AgentsView.vue        # Agent-Status + Live-Aktivität
+│   │   ├── NotesView.vue         # Notes-System (Markdown-Editor)
+│   │   ├── CronView.vue          # Cronjob-Manager
+│   │   ├── SkillsView.vue        # Skills Browser
+│   │   ├── LauncherView.vue      # IDE + GitHub Launcher
+│   │   └── SettingsView.vue      # Config, Themes, Pfade
+│   ├── router/index.ts
+│   ├── App.vue
+│   └── main.ts
+├── package.json
+├── tailwind.config.ts
+└── vite.config.ts
 ```
 
-## 5. Backend-Architektur
-Das FastAPI-Backend dient als Integrations-Hub und WebSocket-Server.
+---
 
-**Kernkomponenten:**
-1.  **WebSocket Manager:** Verwaltet aktive Client-Verbindungen. Pusht asynchrone Events (z.B. "Agent Forge changed status to 'Coding'") an das Frontend, um die < 500ms Anforderung zu erfüllen [7].
-2.  **Service Layer:** Kapselt die Logik für externe Systeme (`GitHubService`, `PMToolService`, `ObsidianService`). Hier implementieren wir Caching (z.B. für GitHub, um das Limit von 5000 Requests/Stunde nicht zu brechen) [4].
-3.  **OS Interop Layer:** Eine stark limitierte, Whitelist-basierte `ShellExecute`-Klasse, die `code .` oder `GodotEditor.exe` sicher ausführt [5].
+## 5. Frontend-Architektur (Vue 3)
 
-## 6. Datenmodelle
-Die Kernentitäten werden als TypeScript-Interfaces (Frontend) und Pydantic-Modelle (Backend) synchron gehalten [11].
+### Routing
+
+| Route | View | Beschreibung |
+|-------|------|-------------|
+| `/` | DashboardView | Hauptübersicht |
+| `/agents` | AgentsView | Live Agent-Status |
+| `/notes` | NotesView | Markdown Notes |
+| `/cron` | CronView | Cronjob-Manager |
+| `/skills` | SkillsView | Skill-Library |
+| `/launcher` | LauncherView | IDE + GitHub Launch |
+| `/settings` | SettingsView | Konfiguration |
+
+### Pinia Stores
+
+```typescript
+// useAgentStore.ts
+interface AgentStore {
+  agents: Agent[]
+  fetchAgents(): Promise<void>           // invoke('get_agents')
+  updateAgentStatus(id, status): void   // invoke('set_agent_status', ...)
+}
+
+// useNotesStore.ts
+interface NotesStore {
+  notes: Note[]
+  activeNote: Note | null
+  filter: NoteCategory | 'all'
+  loadNotes(): Promise<void>            // invoke('list_notes')
+  saveNote(note): Promise<void>         // invoke('save_note', ...)
+  deleteNote(id): Promise<void>         // invoke('delete_note', ...)
+}
+
+// useCronStore.ts
+interface CronStore {
+  jobs: CronJob[]
+  loadJobs(): Promise<void>             // invoke('list_cron_jobs')
+  createJob(job): Promise<void>         // invoke('create_cron_job', ...)
+  toggleJob(id): Promise<void>          // invoke('toggle_cron_job', ...)
+}
+```
+
+### Tauri Event Listener
+
+```typescript
+// Live-Updates vom Rust-Core empfangen
+import { listen } from '@tauri-apps/api/event'
+
+// In useAgentStore
+listen('agent-status-changed', (event) => {
+  const { agentId, status } = event.payload
+  updateAgentInStore(agentId, status)
+})
+
+listen('cron-job-triggered', (event) => {
+  addCronLog(event.payload)
+})
+```
+
+---
+
+## 6. Backend-Architektur (Rust / Tauri Core)
+
+### Tauri Commands (IPC)
+
+```rust
+// commands/agents.rs
+#[tauri::command]
+async fn get_agents(state: State<'_, AppState>) -> Result<Vec<Agent>, String> { ... }
+
+#[tauri::command]
+async fn set_agent_status(id: String, status: AgentStatus, ...) -> Result<(), String> { ... }
+
+// commands/notes.rs
+#[tauri::command]
+async fn list_notes(category: Option<String>) -> Result<Vec<Note>, String> { ... }
+
+#[tauri::command]
+async fn save_note(note: NoteInput) -> Result<Note, String> { ... }  // schreibt in Obsidian Vault
+
+// commands/cron.rs
+#[tauri::command]
+async fn list_cron_jobs() -> Result<Vec<CronJob>, String> { ... }
+
+#[tauri::command]
+async fn create_cron_job(job: CronJobInput) -> Result<CronJob, String> { ... }
+
+// commands/launcher.rs
+#[tauri::command]
+async fn launch_ide(ide: String, path: String) -> Result<(), String> { ... }  // std::process::Command
+
+#[tauri::command]
+async fn open_github_repo(repo_url: String, target: OpenTarget) -> Result<(), String> { ... }
+// target: Browser | GitHubDesktop | Clone
+```
+
+### Cronjob-System (tokio-cron-scheduler)
+
+```rust
+// cron/scheduler.rs
+use tokio_cron_scheduler::{Job, JobScheduler};
+
+pub async fn start_scheduler(app_handle: AppHandle) {
+    let sched = JobScheduler::new().await.unwrap();
+
+    // Beispiel: PM Tool Polling alle 30s
+    sched.add(Job::new_async("*/30 * * * * *", |_, _| Box::pin(async {
+        poll_pm_tool().await;
+        app_handle.emit_all("tasks-updated", payload).unwrap();
+    })).unwrap()).await.unwrap();
+
+    sched.start().await.unwrap();
+}
+```
+
+### Cargo.toml Dependencies
+
+```toml
+[dependencies]
+tauri = { version = "2", features = ["shell-open"] }
+tokio = { version = "1", features = ["full"] }
+tokio-cron-scheduler = "0.13"
+reqwest = { version = "0.12", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+```
+
+---
+
+## 7. Datenmodelle
 
 ```typescript
 // interfaces/Agent.ts
 export interface Agent {
-  id: string; // e.g., 'prism', 'forge', 'jim'
-  name: string;
-  status: 'IDLE' | 'WORKING' | 'OFFLINE' | 'ERROR';
-  activeTaskId?: string;
-  allowedTools: string[];
-  skills: string[];
+  id: 'prism' | 'forge' | 'jim'
+  name: string
+  role: string
+  status: 'IDLE' | 'WORKING' | 'OFFLINE' | 'ERROR'
+  activeTaskId?: string
+  lastSeen: string       // ISO timestamp
+  allowedTools: string[]
+  skills: string[]
+}
+
+// interfaces/Note.ts
+export type NoteCategory = 'prompt' | 'cli-command' | 'agent-file' | 'skill' | 'misc'
+
+export interface Note {
+  id: string             // filename without .md
+  title: string
+  content: string        // Markdown
+  category: NoteCategory
+  tags: string[]
+  createdAt: string
+  updatedAt: string
+  filePath: string       // absoluter Pfad in Obsidian Vault
+}
+
+// interfaces/CronJob.ts
+export interface CronJob {
+  id: string
+  name: string
+  schedule: string       // cron expression (e.g. "*/30 * * * * *")
+  command: string        // was ausgeführt wird
+  enabled: boolean
+  lastRun?: string
+  nextRun?: string
+  lastStatus: 'ok' | 'error' | 'pending'
 }
 
 // interfaces/Skill.ts
 export interface Skill {
-  id: string;
-  name: string;
-  description: string;
-  promptVariants: Record<string, string>;
-  settings: Record<string, any>;
-}
-
-// interfaces/Project.ts
-export interface Project {
-  id: string;
-  name: string;
-  status: string; // aus PM Tool / GitHub
-  assignedAgentIds: string[];
-  repositoryUrl?: string;
-}
-
-// interfaces/Task.ts
-export interface Task {
-  id: string;
-  slug: string;
-  title: string;
-  status: 'TODO' | 'IN_PROGRESS' | 'REVIEW' | 'DONE';
-  source: 'PM_TOOL' | 'TM_LITE_MCP';
-}
-
-// interfaces/Plugin.ts
-export interface Plugin {
-  id: string;
-  name: string;
-  enabled: boolean;
-  config: Record<string, any>;
+  id: string
+  name: string
+  description: string
+  trigger: string
+  category: 'code' | 'review' | 'plan' | 'ship' | 'qa' | 'custom'
+  agent: string
 }
 ```
 
-## 7. Integrations-Architektur
-*   **CMG PM Tool (`localhost:4173`):** Ein dedizierter Background-Worker im FastAPI-Backend pollt alle 30 Sekunden die REST API (`GET /api/tasks`) und pusht Diff-Updates via WebSocket an das Vue-Frontend [4].
-*   **GitHub API:** Authentifizierung via Personal Access Token (PAT). Das Backend fetcht Commits und PRs für die Repos (MMC, popup-bar, etc.) und speichert sie im In-Memory-Cache [4].
-*   **TM-lite MCP & Obsidian:** Da TM-lite ein Node.js MCP Server ist, kommuniziert FastAPI über das Model Context Protocol (via JSON-RPC) mit dem lokalen Server. Obsidian wird über die REST API auf `localhost:27124` mit API-Key direkt angesprochen [4, 5].
-*   **IDE Launcher:** Über Python `subprocess.Popen` werden Windows 11 Shell-Befehle getriggert. Eine statische Whitelist validiert Projektpfade, um Sicherheitsrisiken zu eliminieren [5].
+---
 
-## 8. Plugin-System-Design
-Das System ist "API-first" entworfen, um die Anforderungen an Laufzeit-Erweiterbarkeit zu erfüllen [10]. 
+## 8. Notes-System (Markdown + Obsidian Sync)
 
-**Architektur:**
-*   **Backend-Plugins:** Python-Klassen, die von einer `BasePlugin`-Klasse erben und Lifecycle-Hooks (`on_enable`, `on_disable`, `on_update`) implementieren. Sie können dynamisch eigene FastAPI-Router registrieren.
-*   **Frontend-Plugins:** Vue-Komponenten, die dynamisch über Vite's `import.meta.glob` geladen werden. Jedes Plugin stellt eine `Config.vue` und ein optionales `Widget.vue` für das Dashboard bereit [10].
+### Speicherort
+Alle Notes werden direkt in die Obsidian Vault geschrieben:
+```
+D:\Obsidian\2nd-brain\2nd-brain\UMBRA_Notes\
+├── prompts\
+│   └── 2026-03-17_guter-claude-prompt.md
+├── cli-commands\
+│   └── useful-git-commands.md
+├── agent-files\
+│   └── forge-agents.md
+└── skills\
+    └── review-skill-config.md
+```
 
-Die 5 initialen Plugins (PM Tool, GitHub, TM-lite, Sound Forge, Obsidian) werden intern exakt wie externe Plugins behandelt (Dogfooding), um die Architektur zu validieren [10].
+### Kategorien
+| Kategorie | Beschreibung | Icon |
+|-----------|-------------|------|
+| `prompt` | Gute Claude-Prompts | ✦ |
+| `cli-command` | Nützliche CLI-Befehle | > |
+| `agent-file` | agents.md, CLAUDE.md Snippets | @ |
+| `skill` | Skill-Beschreibungen, Trigger | ⚡ |
+| `misc` | Sonstiges | · |
 
-## 9. Deployment und Dev-Setup
-Das Setup ist für eine hochproduktive Developer Experience (DX) optimiert [6, 7].
+### UI-Konzept
+- **Linke Spalte:** NoteList + Filter (Kategorie-Tabs, Suche)
+- **Rechte Spalte:** Split-View Editor (Markdown Input + Live-Preview side-by-side)
+- **Neue Note:** Floating Action Button (Neon-Stil), Kategorie auswählen
+- **Auto-Save:** Debounced (500ms nach letztem Tastendruck)
 
-*   **Netzwerk & Ports:** Das Frontend läuft über Vite (Dev) auf Port `5173`. Das FastAPI-Backend läuft über Uvicorn auf Port `8766`. Beide sind an `0.0.0.0` gebunden, um aus dem lokalen Netz (`192.168.137.x`) erreichbar zu sein [6].
-*   **OS:** Das System wird exklusiv für Windows 11 mit einer Bash Shell optimiert. Da OS-Level-Befehle (IDE Launcher) hartcodiert auf Windows-Pfade (z.B. `D:\Obsidian\...`) und `GodotEditor.exe` mappen, ist keine plattformübergreifende Abstraktion nötig [5, 6].
-*   **Security:** Es findet keine externe Exponierung statt. Sämtliche Authentifizierungsmechanismen greifen nur auf lokale oder netzwerkinterne Header-Checks zurück ("Local Auth Only") [7].
+---
 
-## 10. MVP-Scope vs Future Scope
-Um schnellstmöglich Mehrwert für den Owner ("Druid") zu generieren, wird streng priorisiert [1, 12].
+## 9. UI/UX Design-Spec (CMG Brand)
 
-**MVP-Scope (Jetzt):**
-*   **Agent Overview:** Statische Auflistung aller Agents (Prism, Forge, Jim) mit simuliertem Live-Status [2, 12].
-*   **Skills Browser:** Vue-UI zur Durchsuchung der Prompt-Bibliothek [12].
-*   **PM Tool Integration:** Nur lesender Zugriff (Polling der Tasks von `localhost:4173`) [4, 12].
-*   **IDE Launcher:** Basis-Funktionalität, um VSCode und Godot aus dem Dashboard zu öffnen [12].
-*   **Plugin Core:** Das grundlegende Interface für das Registrieren von Plugins [12].
+### Ästhetik: Dark Cyberpunk Terminal
 
-**Future Scope (Später):**
-*   **Volle Theme-Engine:** Umschalten zwischen Ember, Neon und Light Themes zur Laufzeit [8, 9].
-*   **Remote Zugriff & Auth:** Sicherer Zugriff aus anderen Netzwerken (VPN/Tunneling) [8].
-*   **Schreibende Integrationen:** Tasks aus UMBRA direkt im PM Tool aktualisieren (`PATCH /api/tasks/{slug}`) [4].
-*   **Erweiterte Plugin-Suite:** Tiefe Integration in GitHub, Sound Forge und TM-lite MCP [10].
+```css
+/* CSS Custom Properties — Dark Theme (Default) */
+:root {
+  /* Backgrounds */
+  --bg-primary: #0a0a0f;
+  --bg-surface: rgba(255, 255, 255, 0.04);
+  --bg-surface-hover: rgba(255, 255, 255, 0.08);
+
+  /* Neon Accents */
+  --accent-neon: #00f5d4;       /* Cyan-Grün */
+  --accent-ember: #ff7b00;      /* Orange */
+  --accent-error: #ff2d55;      /* Rot */
+  --accent-success: #39ff14;    /* Grün */
+
+  /* Typography */
+  --font-primary: 'Iceland', monospace;
+  --font-size-base: 14px;
+
+  /* Glassmorphism */
+  --glass-bg: rgba(255, 255, 255, 0.05);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-blur: blur(16px);
+
+  /* Neon Glow */
+  --glow-neon: 0 0 8px var(--accent-neon), 0 0 24px rgba(0, 245, 212, 0.3);
+  --glow-ember: 0 0 8px var(--accent-ember), 0 0 24px rgba(255, 123, 0, 0.3);
+}
+```
+
+### Komponenten-Spec
+
+**GlassCard:**
+```css
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+}
+```
+
+**AgentStatusBadge:**
+- IDLE → `--accent-neon` (grün, pulsierend bei 0.3s ease)
+- WORKING → `--accent-ember` (orange, schnell pulsierend 0.8s)
+- OFFLINE → grau (no glow)
+- ERROR → `--accent-error` (rot, blinkend)
+
+**Sidebar:**
+- Breite: 220px, Icon + Label
+- Aktiver Link: Neon-Border links + Glow-Text
+- UMBRA Logo: RubikIso-Regular.ttf, Ember-Farbe
+
+**Custom Titlebar:**
+- Rahmenlos (Tauri decorations: false)
+- Eigene Titlebar-Leiste mit UMBRA Logo + Minimize/Close
+- Draggable via `data-tauri-drag-region`
+
+### Themes
+
+| Theme | Accent | Beschreibung |
+|-------|--------|-------------|
+| **Neon** (Default) | Cyan `#00f5d4` | Cyberpunk grün/blau |
+| **Ember** | Orange `#ff7b00` | Warm, dunkel |
+| **Light** | Blau `#0066ff` | Hell, für Tageslicht |
+
+---
+
+## 10. Integrations-Architektur
+
+### PM Tool (polling)
+```rust
+// alle 30s via tokio-cron-scheduler
+async fn poll_pm_tool() -> Vec<Task> {
+    reqwest::get("http://localhost:4173/api/tasks")
+        .await?.json::<Vec<Task>>().await?
+}
+```
+
+### GitHub Integration
+```rust
+// Browser
+tauri::api::shell::open(&app.shell(), "https://github.com/AstroGolem224/MMC", None)?;
+
+// GitHub Desktop
+tauri::api::shell::open(&app.shell(), "github-windows://openRepo?url=...", None)?;
+
+// Clone
+std::process::Command::new("git")
+    .args(["clone", &repo_url, &target_path]).spawn()?;
+```
+
+### IDE Launcher (Whitelist)
+```rust
+const ALLOWED_PATHS: &[&str] = &[
+    "C:/Users/matth/OneDrive/Dokumente/GitHub",
+    "D:/Obsidian",
+];
+
+fn launch_vscode(path: &str) -> Result<()> {
+    assert!(ALLOWED_PATHS.iter().any(|p| path.starts_with(p)));
+    Command::new("code").arg(path).spawn()?;
+    Ok(())
+}
+```
+
+### Obsidian Notes (direktes FS)
+```rust
+async fn save_note(note: NoteInput) -> Result<Note> {
+    let vault_path = "D:/Obsidian/2nd-brain/2nd-brain/UMBRA_Notes";
+    let file_path = format!("{}/{}/{}.md", vault_path, note.category, note.id);
+    tokio::fs::write(&file_path, &note.content).await?;
+    Ok(note.into())
+}
+```
+
+---
+
+## 11. Deployment & Dev-Setup
+
+```bash
+# Voraussetzungen
+rustup update
+npm install -g @tauri-apps/cli@next
+
+# Init (einmalig)
+npm create tauri-app@latest umbra -- --template vue-ts
+
+# Dev-Modus
+npm run tauri dev
+
+# Windows Build
+npm run tauri build   # → target/release/umbra.exe + .msi Installer
+```
+
+**Ports (Dev):** Vite Dev-Server auf Port `1420` (Tauri Standard), kein separater Backend-Port nötig.
+
+---
+
+## 12. MVP-Scope vs. Future Scope
+
+### MVP (Phase 1 — jetzt)
+- Tauri 2 Projekt-Setup (Workspace, tauri.conf.json, Custom Titlebar)
+- Design-System (CSS Variables, Glassmorphism, Iceland-Font, Neon-Komponenten)
+- Layout + Sidebar Navigation
+- **Agent Overview** — 3 Agents + Live-Status (Tauri Events)
+- **Notes-System** — Markdown Editor + Obsidian Vault Sync
+- **IDE + GitHub Launcher** — VSCode, Godot, Browser, GitHub Desktop
+- **PM Tool Integration** — lesend, polling via tokio-cron
+
+### Phase 2
+- **Cronjob-Manager UI** — tokio-cron-scheduler + Editor
+- **Skills Browser** — Skill-Library durchsuchbar
+- **GitHub API** — Repo-Status, offene PRs
+
+### Phase 3 (Future)
+- **Theme-Engine** — Laufzeit-Switcher (Neon/Ember/Light)
+- **TM-lite MCP Integration** — Tasks aus UMBRA erstellen
+- **Plugin-System** — erweiterbare Widgets
+
+---
+
+*Architektur-Dokument v2 — generiert mit NotebookLM "Master Software Architect" + Forge*
