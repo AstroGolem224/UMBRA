@@ -10,9 +10,11 @@ use tauri_plugin_window_state::Builder as WindowStateBuilder;
 use commands::agents::get_agents;
 use commands::config::{get_config, load_config, save_config};
 use commands::cron::{create_cron_job, delete_cron_job, list_cron_jobs, run_cron_job_now, toggle_cron_job};
+use commands::github::get_github_repos;
 use commands::integrations::get_pm_tasks;
 use commands::launcher::{launch_target, open_github};
 use commands::notes::{delete_note, list_notes, save_note};
+use commands::plugins::{get_obsidian_stats, get_tmlite_tasks, list_skills};
 use state::AppState;
 
 fn config_path() -> PathBuf {
@@ -56,6 +58,10 @@ pub fn run() {
             toggle_cron_job,
             delete_cron_job,
             run_cron_job_now,
+            get_github_repos,
+            get_obsidian_stats,
+            get_tmlite_tasks,
+            list_skills,
         ])
         .run(tauri::generate_context!())
         .expect("error while running UMBRA");

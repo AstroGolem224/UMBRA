@@ -62,6 +62,19 @@ pub struct AppConfig {
     pub pm_tool_poll_seconds: u64,
     #[serde(default)]
     pub cron_jobs: Vec<CronJobConfig>,
+    #[serde(default)]
+    pub github_pat: Option<String>,
+    #[serde(default)]
+    pub agent_notes: std::collections::HashMap<String, AgentNote>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentNote {
+    #[serde(default)]
+    pub notes: String,
+    #[serde(default)]
+    pub link: String,
 }
 
 fn default_theme() -> String { "ember".into() }
@@ -109,6 +122,8 @@ impl Default for AppConfig {
             pm_tool_url: default_pm_url(),
             pm_tool_poll_seconds: default_poll_seconds(),
             cron_jobs: vec![],
+            github_pat: None,
+            agent_notes: std::collections::HashMap::new(),
         }
     }
 }
