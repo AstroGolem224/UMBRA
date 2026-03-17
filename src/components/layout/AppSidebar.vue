@@ -23,24 +23,28 @@
 import { computed } from "vue";
 import { useRoute } from "vue-router";
 import { useAgentStore } from "@/stores/useAgentStore";
+import { useTaskStore } from "@/stores/useTaskStore";
 
 const route = useRoute();
 const agentStore = useAgentStore();
+const taskStore = useTaskStore();
 
 const backendConnected = computed(() => (agentStore.agents?.length ?? 0) > 0 || !agentStore.loading);
+const activeTaskCount = computed(() => taskStore.tasks.filter((t) => t.status === "in-progress").length);
 
 function isActive(path: string) {
   return route.path.startsWith(path);
 }
 
-const navItems: { path: string; icon: string; label: string; badge?: string }[] = [
+const navItems = computed(() => [
   { path: "/dashboard", icon: "◈", label: "DASHBOARD" },
-  { path: "/agents", icon: "◉", label: "AGENTS" },
-  { path: "/notes", icon: "◎", label: "NOTES" },
-  { path: "/launcher", icon: "▶", label: "LAUNCHER" },
-  { path: "/skills", icon: "⚡", label: "SKILLS" },
-  { path: "/settings", icon: "⚙", label: "SETTINGS" },
-];
+  { path: "/agents",    icon: "◉", label: "AGENTS" },
+  { path: "/tasks",     icon: "▣", label: "TASKS", badge: activeTaskCount.value > 0 ? String(activeTaskCount.value) : undefined },
+  { path: "/notes",     icon: "◎", label: "NOTES" },
+  { path: "/launcher",  icon: "▶", label: "LAUNCHER" },
+  { path: "/skills",    icon: "⚡", label: "SKILLS" },
+  { path: "/settings",  icon: "⚙", label: "SETTINGS" },
+]);
 </script>
 
 <style scoped>

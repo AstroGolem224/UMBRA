@@ -1,5 +1,7 @@
 <template>
   <div id="umbra-root" :data-theme="configStore.config.theme">
+    <div class="scanlines" aria-hidden="true" />
+    <div class="noise-overlay" aria-hidden="true" />
     <AppLayout />
   </div>
 </template>

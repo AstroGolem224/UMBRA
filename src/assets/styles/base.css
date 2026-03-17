@@ -9,64 +9,119 @@
   font-style: normal;
 }
 
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   UMBRA — CSS Design Tokens (BRAND.md v2.1 compliant)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
 :root {
-  /* Backgrounds */
-  --bg-primary: #0a0a0f;
-  --bg-secondary: #0f0f1a;
-  --bg-surface: rgba(255, 255, 255, 0.04);
-  --bg-surface-hover: rgba(255, 255, 255, 0.08);
-  --bg-sidebar: rgba(5, 5, 10, 0.85);
+  /* ─── Backgrounds ──────────────────────────────── */
+  --bg-primary:       #080d13;
+  --bg-secondary:     #0c1214;
+  --bg-surface:       rgba(20, 27, 32, 0.72);
+  --bg-surface-hover: rgba(28, 40, 48, 0.90);
+  --bg-sidebar:       rgba(8, 13, 19, 0.97);
+  --bg-elevated:      #1c2830;
 
-  /* Accent — Neon Theme (default) */
-  --accent: #00f5d4;
-  --accent-dim: rgba(0, 245, 212, 0.3);
-  --accent-ember: #ff7b00;
-  --accent-ember-dim: rgba(255, 123, 0, 0.3);
-  --accent-error: #ff2d55;
-  --accent-success: #39ff14;
+  /* ─── Accent — Ember Theme (default) ──────────── */
+  --accent:           #d4520a;
+  --accent-primary:   #d4520a;
+  --accent-secondary: #c9972a;
+  --accent-gold:      #c9972a;
+  --accent-ember:     #d4520a;
+  --accent-ember-dim: rgba(212, 82, 10, 0.25);
+  --accent-dim:       rgba(212, 82, 10, 0.15);
+  --rune-glow:        #ff7b2e;
 
-  /* Text */
-  --text-primary: rgba(255, 255, 255, 0.92);
-  --text-secondary: rgba(255, 255, 255, 0.55);
-  --text-muted: rgba(255, 255, 255, 0.3);
+  /* ─── Static Neon (theme-independent) ─────────── */
+  --neon-cyan:    #0de8f5;
+  --neon-violet:  #a855f7;
+  --neon-green:   #4caf50;
+  --neon-amber:   #f59e0b;
+  --neon-red:     #ef4444;
 
-  /* Glass */
-  --glass-bg: rgba(255, 255, 255, 0.05);
-  --glass-border: rgba(255, 255, 255, 0.10);
-  --glass-blur: 16px;
+  /* ─── Semantic aliases ─────────────────────────── */
+  --accent-error:   #ef4444;
+  --accent-success: #4caf50;
 
-  /* Glow */
-  --glow-neon: 0 0 8px var(--accent), 0 0 24px var(--accent-dim);
-  --glow-ember: 0 0 8px var(--accent-ember), 0 0 24px var(--accent-ember-dim);
+  /* ─── Text ─────────────────────────────────────── */
+  --text-primary:   #e0ddd5;
+  --text-secondary: #8a8578;
+  --text-muted:     #5a5548;
 
-  /* Sidebar */
-  --sidebar-width: 220px;
+  /* ─── Glass ─────────────────────────────────────── */
+  --glass-bg:         rgba(12, 18, 20, 0.92);
+  --glass-border:     rgba(212, 82, 10, 0.12);
+  --glass-border-hot: rgba(212, 82, 10, 0.40);
+  --glass-blur:       12px;
 
-  /* Titlebar */
+  /* ─── Glow ──────────────────────────────────────── */
+  --glow-primary: 0 0 20px rgba(212, 82, 10, 0.30);
+  --glow-neon:    0 0 20px rgba(212, 82, 10, 0.30);
+  --glow-ember:   0 0 20px rgba(212, 82, 10, 0.30);
+  --glow-soft:    0 0 40px rgba(212, 82, 10, 0.08);
+
+  /* ─── Fonts ─────────────────────────────────────── */
+  --font-display: 'Barlow Condensed', 'Arial Narrow', Impact, sans-serif;
+  --font-sans:    'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono:    'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+
+  /* ─── Layout ─────────────────────────────────────── */
+  --sidebar-width:   220px;
   --titlebar-height: 36px;
 }
 
+/* ─── Neon Theme ──────────────────────────────────── */
+[data-theme="neon"] {
+  --accent:           #0de8f5;
+  --accent-primary:   #0de8f5;
+  --accent-secondary: #a855f7;
+  --accent-ember:     #0de8f5;
+  --accent-dim:       rgba(13, 232, 245, 0.15);
+  --accent-ember-dim: rgba(13, 232, 245, 0.20);
+  --rune-glow:        #0de8f5;
+  --glass-border:     rgba(13, 232, 245, 0.12);
+  --glass-border-hot: rgba(13, 232, 245, 0.40);
+  --glow-primary:     0 0 20px rgba(13, 232, 245, 0.35);
+  --glow-neon:        0 0 20px rgba(13, 232, 245, 0.35);
+  --glow-ember:       0 0 20px rgba(13, 232, 245, 0.35);
+  --glow-soft:        0 0 40px rgba(13, 232, 245, 0.08);
+}
+
+/* ─── Ember Theme (explicit — same as :root defaults) */
 [data-theme="ember"] {
-  --accent: #ff7b00;
-  --accent-dim: rgba(255, 123, 0, 0.3);
-  --glow-neon: var(--glow-ember);
+  --accent:           #d4520a;
+  --accent-primary:   #d4520a;
+  --accent-secondary: #c9972a;
+  --glow-neon:        var(--glow-ember);
 }
 
+/* ─── Light Theme ─────────────────────────────────── */
 [data-theme="light"] {
-  --bg-primary: #f0f0f5;
-  --bg-secondary: #e8e8f0;
-  --bg-surface: rgba(0, 0, 0, 0.04);
-  --bg-surface-hover: rgba(0, 0, 0, 0.08);
-  --bg-sidebar: rgba(230, 230, 245, 0.92);
-  --accent: #0066ff;
-  --accent-dim: rgba(0, 102, 255, 0.3);
-  --text-primary: rgba(0, 0, 0, 0.9);
-  --text-secondary: rgba(0, 0, 0, 0.6);
-  --text-muted: rgba(0, 0, 0, 0.3);
-  --glass-bg: rgba(255, 255, 255, 0.6);
-  --glass-border: rgba(0, 0, 0, 0.1);
+  --bg-primary:       #f1f5f9;
+  --bg-secondary:     #e8ecf0;
+  --bg-surface:       rgba(255, 255, 255, 0.80);
+  --bg-surface-hover: rgba(0, 0, 0, 0.05);
+  --bg-sidebar:       rgba(230, 235, 245, 0.97);
+  --bg-elevated:      #ffffff;
+  --accent:           #0891b2;
+  --accent-primary:   #0891b2;
+  --accent-secondary: #7c3aed;
+  --accent-ember:     #0891b2;
+  --accent-dim:       rgba(8, 145, 178, 0.15);
+  --accent-ember-dim: rgba(8, 145, 178, 0.15);
+  --rune-glow:        #0891b2;
+  --text-primary:     rgba(0, 0, 0, 0.88);
+  --text-secondary:   rgba(0, 0, 0, 0.55);
+  --text-muted:       rgba(0, 0, 0, 0.32);
+  --glass-bg:         rgba(255, 255, 255, 0.85);
+  --glass-border:     rgba(0, 0, 0, 0.10);
+  --glass-border-hot: rgba(0, 0, 0, 0.25);
+  --glow-primary:     0 0 20px rgba(8, 145, 178, 0.20);
+  --glow-neon:        0 0 20px rgba(8, 145, 178, 0.20);
+  --glow-ember:       0 0 20px rgba(8, 145, 178, 0.20);
+  --glow-soft:        0 0 40px rgba(8, 145, 178, 0.06);
 }
 
+/* ─── Reset ───────────────────────────────────────── */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -80,18 +135,77 @@ body,
   height: 100%;
   overflow: hidden;
   background: transparent;
-  font-family: "Iceland", monospace;
+  font-family: var(--font-sans);
   color: var(--text-primary);
   font-size: 14px;
   line-height: 1.5;
 }
 
-::-webkit-scrollbar {
-  width: 4px;
+/* ─── Atmosphere: Radial Ambient Glows ────────────── */
+/* On #umbra-root so theme-vars cascade correctly     */
+#umbra-root {
+  position: relative;
 }
-::-webkit-scrollbar-track {
-  background: transparent;
+
+#umbra-root::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 20% 60%,
+      color-mix(in srgb, var(--accent-primary) 8%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%,
+      color-mix(in srgb, var(--accent-secondary) 6%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 90%,
+      color-mix(in srgb, var(--accent-primary) 4%, transparent) 0%, transparent 50%);
+  animation: ambient-drift 25s ease-in-out infinite alternate;
 }
+
+@keyframes ambient-drift {
+  0%   { transform: scale(1) translate(0, 0); }
+  100% { transform: scale(1.08) translate(-12px, 6px); }
+}
+
+/* ─── Scanlines (CRT overlay) ─────────────────────── */
+.scanlines {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9998;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
+}
+
+/* ─── Noise Grain ─────────────────────────────────── */
+.noise-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9997;
+  opacity: 0.028;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 256px 256px;
+}
+
+/* ─── Reduced Motion ──────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  #umbra-root::before { animation: none; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ─── Scrollbar ───────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: var(--accent-dim);
   border-radius: 2px;

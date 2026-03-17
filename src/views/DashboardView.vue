@@ -80,6 +80,8 @@ const configStore = useConfigStore();
 onMounted(() => {
   agentStore.loadAgents();
   notesStore.loadNotes();
+  taskStore.fetchTasks();
+  taskStore.setupLiveUpdates();
 });
 
 const noteCategories: NoteCategory[] = ["prompts", "cli", "agents", "skills", "misc"];

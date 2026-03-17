@@ -19,6 +19,10 @@ export const router = createRouter({
       component: () => import("@/views/LauncherView.vue"),
     },
     {
+      path: "/tasks",
+      component: () => import("@/views/TasksView.vue"),
+    },
+    {
       path: "/skills",
       component: () => import("@/views/SkillsView.vue"),
     },
