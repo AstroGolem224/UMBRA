@@ -9,6 +9,8 @@ use tauri_plugin_window_state::Builder as WindowStateBuilder;
 
 use commands::agents::get_agents;
 use commands::config::{get_config, load_config, save_config};
+use commands::cron::{create_cron_job, delete_cron_job, list_cron_jobs, run_cron_job_now, toggle_cron_job};
+use commands::integrations::get_pm_tasks;
 use commands::launcher::{launch_target, open_github};
 use commands::notes::{delete_note, list_notes, save_note};
 use state::AppState;
@@ -48,6 +50,12 @@ pub fn run() {
             delete_note,
             launch_target,
             open_github,
+            get_pm_tasks,
+            list_cron_jobs,
+            create_cron_job,
+            toggle_cron_job,
+            delete_cron_job,
+            run_cron_job_now,
         ])
         .run(tauri::generate_context!())
         .expect("error while running UMBRA");

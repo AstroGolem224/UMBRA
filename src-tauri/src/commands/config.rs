@@ -25,6 +25,26 @@ pub struct GithubTarget {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CronJobConfig {
+    pub id: String,
+    pub name: String,
+    pub schedule: String,
+    pub command: String,
+    #[serde(default = "bool_true")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub last_run: Option<String>,
+    #[serde(default = "default_last_status")]
+    pub last_status: String,
+    #[serde(default)]
+    pub last_output: Option<String>,
+}
+
+fn bool_true() -> bool { true }
+fn default_last_status() -> String { "pending".into() }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AppConfig {
     #[serde(default = "default_theme")]
     pub theme: String,
@@ -40,6 +60,8 @@ pub struct AppConfig {
     pub pm_tool_url: String,
     #[serde(default = "default_poll_seconds")]
     pub pm_tool_poll_seconds: u64,
+    #[serde(default)]
+    pub cron_jobs: Vec<CronJobConfig>,
 }
 
 fn default_theme() -> String { "ember".into() }
@@ -86,6 +108,7 @@ impl Default for AppConfig {
             ],
             pm_tool_url: default_pm_url(),
             pm_tool_poll_seconds: default_poll_seconds(),
+            cron_jobs: vec![],
         }
     }
 }

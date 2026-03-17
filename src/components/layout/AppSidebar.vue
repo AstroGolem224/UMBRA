@@ -40,6 +40,7 @@ const navItems = computed(() => [
   { path: "/dashboard", icon: "◈", label: "DASHBOARD" },
   { path: "/agents",    icon: "◉", label: "AGENTS" },
   { path: "/tasks",     icon: "▣", label: "TASKS", badge: activeTaskCount.value > 0 ? String(activeTaskCount.value) : undefined },
+  { path: "/cron",      icon: "⏱", label: "CRON" },
   { path: "/notes",     icon: "◎", label: "NOTES" },
   { path: "/launcher",  icon: "▶", label: "LAUNCHER" },
   { path: "/skills",    icon: "⚡", label: "SKILLS" },

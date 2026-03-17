@@ -40,6 +40,7 @@ export interface CronJob {
   lastRun?: string;
   nextRun?: string;
   lastStatus: "ok" | "error" | "pending";
+  lastOutput?: string;
 }
 
 export interface Task {

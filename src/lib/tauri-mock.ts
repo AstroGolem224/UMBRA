@@ -10,6 +10,11 @@ const MOCK_DEFAULTS: Record<string, unknown> = {
   delete_note: null,
   launch_target: null,
   open_github: null,
+  list_cron_jobs: [],
+  create_cron_job: null,
+  toggle_cron_job: true,
+  delete_cron_job: null,
+  run_cron_job_now: "",
 };
 
 export const invoke = async (_cmd: string, _args?: unknown): Promise<unknown> => {
