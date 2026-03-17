@@ -9,7 +9,7 @@ const defaults: AppConfig = {
   notesSubdir: "UMBRA_Notes",
   launchTargets: [],
   githubTargets: [],
-  pmToolUrl: "http://localhost:4173",
+  pmToolUrl: "http://100.115.61.30:8000",
   pmToolPollSeconds: 30,
 };
 

@@ -20,6 +20,7 @@ pub enum AppError {
     #[error("Launch target not in whitelist: {0}")]
     TargetNotAllowed(String),
 
+    #[allow(dead_code)]
     #[error("{0}")]
     Other(String),
 }

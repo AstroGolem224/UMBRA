@@ -1,4 +1,8 @@
 pub mod agents;
 pub mod config;
+pub mod cron;
+pub mod github;
+pub mod integrations;
 pub mod launcher;
 pub mod notes;
+pub mod plugins;

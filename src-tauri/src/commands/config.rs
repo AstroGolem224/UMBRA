@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use tauri::State;
 use tokio::fs;
 
-use crate::errors::{AppError, Result};
+use crate::errors::AppError;
 use crate::state::AppState;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,6 +25,26 @@ pub struct GithubTarget {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CronJobConfig {
+    pub id: String,
+    pub name: String,
+    pub schedule: String,
+    pub command: String,
+    #[serde(default = "bool_true")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub last_run: Option<String>,
+    #[serde(default = "default_last_status")]
+    pub last_status: String,
+    #[serde(default)]
+    pub last_output: Option<String>,
+}
+
+fn bool_true() -> bool { true }
+fn default_last_status() -> String { "pending".into() }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AppConfig {
     #[serde(default = "default_theme")]
     pub theme: String,
@@ -40,6 +60,21 @@ pub struct AppConfig {
     pub pm_tool_url: String,
     #[serde(default = "default_poll_seconds")]
     pub pm_tool_poll_seconds: u64,
+    #[serde(default)]
+    pub cron_jobs: Vec<CronJobConfig>,
+    #[serde(default)]
+    pub github_pat: Option<String>,
+    #[serde(default)]
+    pub agent_notes: std::collections::HashMap<String, AgentNote>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentNote {
+    #[serde(default)]
+    pub notes: String,
+    #[serde(default)]
+    pub link: String,
 }
 
 fn default_theme() -> String { "ember".into() }
@@ -47,7 +82,7 @@ fn default_vault_path() -> String {
     r"D:\Obsidian\2nd-brain\2nd-brain".into()
 }
 fn default_notes_subdir() -> String { "UMBRA_Notes".into() }
-fn default_pm_url() -> String { "http://localhost:4173".into() }
+fn default_pm_url() -> String { "http://100.115.61.30:8000".into() }
 fn default_poll_seconds() -> u64 { 30 }
 
 impl Default for AppConfig {
@@ -86,6 +121,9 @@ impl Default for AppConfig {
             ],
             pm_tool_url: default_pm_url(),
             pm_tool_poll_seconds: default_poll_seconds(),
+            cron_jobs: vec![],
+            github_pat: None,
+            agent_notes: std::collections::HashMap::new(),
         }
     }
 }

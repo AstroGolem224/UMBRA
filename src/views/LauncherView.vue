@@ -28,7 +28,15 @@
     </section>
 
     <section class="section">
-      <h2 class="section-title">GITHUB</h2>
+      <h2 class="section-title">
+        GITHUB
+        <button
+          class="refresh-btn"
+          :class="{ spinning: githubStore.loading }"
+          @click="githubStore.loadRepos()"
+          title="Refresh repo status"
+        >⟳</button>
+      </h2>
       <div class="launcher-grid">
         <GlassCard
           v-for="repo in githubTargets"
@@ -43,8 +51,20 @@
               <span class="launcher-path">{{ repo.owner }}/{{ repo.repo }}</span>
             </div>
           </div>
+          <div v-if="githubStore.repoById(repo.id)" class="repo-status">
+            <span class="repo-stat">
+              <span class="repo-stat-icon">◈</span>
+              {{ githubStore.repoById(repo.id)!.openIssues }} open
+            </span>
+            <span v-if="githubStore.repoById(repo.id)!.pushedAt" class="repo-stat">
+              <span class="repo-stat-icon">↑</span>
+              {{ relativeTime(githubStore.repoById(repo.id)!.pushedAt!) }}
+            </span>
+          </div>
+          <div v-else-if="githubStore.loading" class="repo-status-loading">fetching...</div>
         </GlassCard>
       </div>
+      <div v-if="githubStore.error" class="error-bar">{{ githubStore.error }}</div>
     </section>
 
     <div v-if="lastError" class="error-bar">{{ lastError }}</div>
@@ -52,19 +72,34 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, onMounted } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { useConfigStore } from "@/stores/useConfigStore";
+import { useGithubStore } from "@/stores/useGithubStore";
 import GlassCard from "@/components/ui/GlassCard.vue";
 import type { LaunchTarget, GithubOpenTarget } from "@/interfaces";
 
 const configStore = useConfigStore();
+const githubStore = useGithubStore();
 const launching = ref<string | null>(null);
 const lastError = ref<string | null>(null);
 
 const ides = computed<LaunchTarget[]>(() => configStore.config.launchTargets ?? []);
-
 const githubTargets = computed<GithubOpenTarget[]>(() => configStore.config.githubTargets ?? []);
+
+onMounted(() => {
+  githubStore.loadRepos();
+});
+
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
 
 async function launchIde(target: LaunchTarget) {
   launching.value = target.id;
@@ -114,9 +149,7 @@ async function openGithub(target: GithubOpenTarget) {
   letter-spacing: 0.1em;
 }
 
-.section {
-  margin-bottom: 28px;
-}
+.section { margin-bottom: 28px; }
 
 .section-title {
   font-family: "Iceland", monospace;
@@ -125,7 +158,25 @@ async function openGithub(target: GithubOpenTarget) {
   color: var(--text-muted);
   margin: 0 0 12px;
   text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
+
+.refresh-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.2s;
+}
+.refresh-btn:hover { color: var(--accent); }
+.refresh-btn.spinning { animation: spin 0.8s linear infinite; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
 
 .launcher-grid {
   display: grid;
@@ -178,8 +229,39 @@ async function openGithub(target: GithubOpenTarget) {
   animation: blink 0.8s step-end infinite;
 }
 
-@keyframes blink {
-  50% { opacity: 0; }
+@keyframes blink { 50% { opacity: 0; } }
+
+.repo-status {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--glass-border);
+}
+
+.repo-stat {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.repo-stat-icon {
+  color: var(--accent);
+  font-size: 9px;
+}
+
+.repo-status-loading {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--glass-border);
+  font-size: 10px;
+  color: var(--text-muted);
+  font-family: "Iceland", monospace;
+  letter-spacing: 0.08em;
+  animation: blink 1.2s step-end infinite;
 }
 
 .error-bar {

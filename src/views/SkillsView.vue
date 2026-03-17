@@ -3,19 +3,15 @@
     <header class="page-header">
       <h1 class="page-title">SKILLS</h1>
       <span class="page-subtitle">{{ filtered.length }} skills</span>
+      <NeonButton size="sm" variant="secondary" ghost :loading="loading" @click="load">↺</NeonButton>
     </header>
 
     <div class="toolbar">
       <input v-model="search" class="search-input glass-input" placeholder="Search skills..." />
-      <select v-model="filterAgent" class="agent-filter glass-input">
-        <option value="">All Agents</option>
-        <option value="prism">Prism</option>
-        <option value="forge">Forge</option>
-        <option value="jim">Jim</option>
-      </select>
     </div>
 
-    <div v-if="agentStore.loading" class="loading">Loading skills...</div>
+    <div v-if="loading" class="loading">Scanning ~/.claude/skills/...</div>
+    <div v-else-if="error" class="error-msg">{{ error }}</div>
     <div v-else class="skills-grid">
       <GlassCard
         v-for="skill in filtered"
@@ -25,9 +21,9 @@
       >
         <div class="skill-header">
           <span class="skill-name">{{ skill.name }}</span>
-          <span class="skill-agent">{{ skill.agentId }}</span>
+          <span v-if="skill.version" class="skill-version">v{{ skill.version }}</span>
         </div>
-        <p class="skill-desc">{{ skill.description }}</p>
+        <p class="skill-desc">{{ skill.description || 'No description.' }}</p>
       </GlassCard>
     </div>
 
@@ -38,15 +34,15 @@
             <span class="modal-title">{{ selected.name }}</span>
             <button class="close-btn" @click="selected = null">✕</button>
           </div>
-          <p class="modal-desc">{{ selected.description }}</p>
+          <div v-if="selected.version" class="modal-section">
+            <span class="modal-label">VERSION</span>
+            <span class="modal-val">v{{ selected.version }}</span>
+          </div>
           <div class="modal-section">
-            <span class="modal-label">AGENT</span>
-            <span class="modal-val">{{ selected.agentId }}</span>
+            <span class="modal-label">FOLDER</span>
+            <span class="modal-val mono">~/.claude/skills/{{ selected.id }}/</span>
           </div>
-          <div v-if="selected.promptTemplate" class="modal-section">
-            <span class="modal-label">PROMPT TEMPLATE</span>
-            <pre class="prompt-pre">{{ selected.promptTemplate }}</pre>
-          </div>
+          <p class="modal-desc">{{ selected.description || 'No description available.' }}</p>
         </div>
       </div>
     </Transition>
@@ -54,42 +50,43 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { useAgentStore } from "@/stores/useAgentStore";
+import { ref, computed, onMounted } from "vue";
+import { invoke } from "@tauri-apps/api/core";
 import GlassCard from "@/components/ui/GlassCard.vue";
+import NeonButton from "@/components/ui/NeonButton.vue";
 
-interface Skill {
+interface SkillInfo {
   id: string;
   name: string;
+  version: string;
   description: string;
-  agentId: string;
-  promptTemplate?: string;
 }
 
-const agentStore = useAgentStore();
+const skills = ref<SkillInfo[]>([]);
+const loading = ref(false);
+const error = ref<string | null>(null);
 const search = ref("");
-const filterAgent = ref("");
-const selected = ref<Skill | null>(null);
+const selected = ref<SkillInfo | null>(null);
 
-const allSkills = computed<Skill[]>(() => {
-  return agentStore.agents.flatMap((agent) =>
-    agent.skills.map((s) => ({
-      id: `${agent.id}:${s}`,
-      name: s,
-      description: `${agent.name} skill: ${s}`,
-      agentId: agent.id,
-    }))
-  );
-});
+async function load() {
+  loading.value = true;
+  error.value = null;
+  try {
+    skills.value = await invoke<SkillInfo[]>("list_skills");
+  } catch (e) {
+    error.value = String(e);
+  } finally {
+    loading.value = false;
+  }
+}
 
 const filtered = computed(() =>
-  allSkills.value.filter((s) => {
-    const matchSearch =
-      !search.value || s.name.toLowerCase().includes(search.value.toLowerCase());
-    const matchAgent = !filterAgent.value || s.agentId === filterAgent.value;
-    return matchSearch && matchAgent;
-  })
+  skills.value.filter(
+    (s) => !search.value || s.name.toLowerCase().includes(search.value.toLowerCase()) || s.description.toLowerCase().includes(search.value.toLowerCase())
+  )
 );
+
+onMounted(load);
 </script>
 
 <style scoped>
@@ -106,8 +103,9 @@ const filtered = computed(() =>
 }
 
 .page-title {
-  font-family: "Iceland", monospace;
+  font-family: var(--font-display), "Iceland", monospace;
   font-size: 24px;
+  font-weight: 700;
   letter-spacing: 0.2em;
   color: var(--text-primary);
   margin: 0;
@@ -117,6 +115,7 @@ const filtered = computed(() =>
   font-size: 12px;
   color: var(--text-muted);
   letter-spacing: 0.1em;
+  flex: 1;
 }
 
 .toolbar {
@@ -131,22 +130,12 @@ const filtered = computed(() =>
   padding: 7px 12px;
 }
 
-.agent-filter {
-  font-family: "Iceland", monospace;
-  font-size: 12px;
-  padding: 7px 12px;
-  background: var(--glass-bg);
-  color: var(--text-primary);
-  border: 1px solid var(--glass-border);
-  border-radius: 6px;
-  cursor: pointer;
-}
-.agent-filter option { background: var(--bg-surface); }
-
-.loading {
+.loading, .error-msg {
   font-size: 13px;
   color: var(--text-muted);
+  padding: 20px 0;
 }
+.error-msg { color: var(--accent-error); }
 
 .skills-grid {
   display: grid;
@@ -162,28 +151,31 @@ const filtered = computed(() =>
 }
 
 .skill-name {
-  font-family: "Iceland", monospace;
+  font-family: var(--font-display), "Iceland", monospace;
   font-size: 13px;
+  font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--text-primary);
 }
 
-.skill-agent {
+.skill-version {
   font-size: 10px;
-  font-family: "Iceland", monospace;
+  font-family: var(--font-mono), monospace;
   color: var(--accent);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  letter-spacing: 0.06em;
 }
 
 .skill-desc {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--text-muted);
   margin: 0;
   line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-/* Modal */
 .skill-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -195,7 +187,7 @@ const filtered = computed(() =>
 }
 
 .skill-modal {
-  width: min(600px, 90vw);
+  width: min(560px, 90vw);
   max-height: 80vh;
   overflow-y: auto;
   padding: 24px;
@@ -205,12 +197,13 @@ const filtered = computed(() =>
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .modal-title {
-  font-family: "Iceland", monospace;
+  font-family: var(--font-display), "Iceland", monospace;
   font-size: 20px;
+  font-weight: 700;
   letter-spacing: 0.12em;
   color: var(--text-primary);
   text-transform: uppercase;
@@ -227,15 +220,8 @@ const filtered = computed(() =>
 }
 .close-btn:hover { color: var(--text-primary); background: var(--bg-surface-hover); }
 
-.modal-desc {
-  font-size: 13px;
-  color: var(--text-secondary);
-  line-height: 1.6;
-  margin: 0 0 16px;
-}
-
 .modal-section {
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .modal-label {
@@ -243,35 +229,30 @@ const filtered = computed(() =>
   font-size: 10px;
   letter-spacing: 0.15em;
   color: var(--text-muted);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .modal-val {
   font-size: 12px;
-  font-family: "Iceland", monospace;
+  font-family: var(--font-display), "Iceland", monospace;
   color: var(--accent);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-.prompt-pre {
-  background: var(--bg-surface);
-  padding: 12px;
-  border-radius: 6px;
-  border-left: 2px solid var(--accent);
-  font-size: 12px;
-  color: var(--text-secondary);
-  white-space: pre-wrap;
-  word-break: break-word;
-  margin: 0;
+.modal-val.mono {
+  font-family: var(--font-mono), monospace;
+  text-transform: none;
+  font-size: 11px;
 }
 
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.15s;
+.modal-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 12px 0 0;
 }
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
+
+.fade-enter-active, .fade-leave-active { transition: opacity 0.15s; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>
