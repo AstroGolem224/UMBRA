@@ -67,6 +67,22 @@ export interface GithubOpenTarget {
   repo: string;
 }
 
+export interface RepoInfo {
+  id: string;
+  name: string;
+  owner: string;
+  repo: string;
+  fullName: string;
+  openIssues: number;
+  pushedAt?: string;
+  htmlUrl: string;
+}
+
+export interface AgentNote {
+  notes: string;
+  link: string;
+}
+
 export interface AppConfig {
   theme: string;
   vaultPath: string;
@@ -75,4 +91,6 @@ export interface AppConfig {
   githubTargets?: GithubOpenTarget[];
   pmToolUrl: string;
   pmToolPollSeconds: number;
+  githubPat?: string;
+  agentNotes?: Record<string, AgentNote>;
 }

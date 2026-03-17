@@ -9,11 +9,19 @@
         <h3 class="card-title">APPEARANCE</h3>
         <div class="field">
           <label class="field-label">Theme</label>
-          <select v-model="draft.theme" class="field-input glass-input">
-            <option value="ember">Ember (default)</option>
-            <option value="neon">Neon</option>
-            <option value="light">Light</option>
-          </select>
+          <div class="theme-swatches">
+            <button
+              v-for="t in themes"
+              :key="t.value"
+              class="theme-swatch"
+              :class="{ active: draft.theme === t.value }"
+              type="button"
+              @click="applyTheme(t.value)"
+            >
+              <span class="swatch-dot" :style="{ background: t.color }" />
+              {{ t.label }}
+            </button>
+          </div>
         </div>
       </GlassCard>
 
@@ -51,6 +59,15 @@
         </div>
       </GlassCard>
 
+      <GlassCard>
+        <h3 class="card-title">GITHUB</h3>
+        <div class="field">
+          <label class="field-label">Personal Access Token (PAT)</label>
+          <input v-model="draft.githubPat" class="field-input glass-input" type="password" placeholder="ghp_..." autocomplete="off" />
+        </div>
+        <p class="field-hint">Token needs <code>public_repo</code> scope (or <code>repo</code> for private repos). Leave blank for public repos without rate-limit auth.</p>
+      </GlassCard>
+
       <div class="form-actions">
         <NeonButton type="submit" variant="primary" :loading="saving">SAVE SETTINGS</NeonButton>
         <span v-if="saved" class="saved-label">Saved.</span>
@@ -69,6 +86,17 @@ import type { AppConfig } from "@/interfaces";
 const configStore = useConfigStore();
 const saving = ref(false);
 const saved = ref(false);
+
+const themes = [
+  { value: "ember", label: "Ember", color: "#d4520a" },
+  { value: "neon",  label: "Neon",  color: "#00f5ff" },
+  { value: "light", label: "Light", color: "#3b82f6" },
+];
+
+function applyTheme(t: string) {
+  draft.theme = t;
+  configStore.setTheme(t);
+}
 
 const draft = reactive<AppConfig>({ ...configStore.config });
 
@@ -166,5 +194,57 @@ async function save() {
   color: var(--accent-success);
   font-family: "Iceland", monospace;
   letter-spacing: 0.1em;
+}
+
+.field-hint {
+  font-size: 10px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin-top: 6px;
+}
+
+.field-hint code {
+  font-family: var(--font-mono);
+  color: var(--accent-secondary);
+  font-size: 10px;
+}
+
+.theme-swatches {
+  display: flex;
+  gap: 8px;
+}
+
+.theme-swatch {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--glass-border);
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-family: "Iceland", monospace;
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.theme-swatch:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.theme-swatch.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.swatch-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 </style>
