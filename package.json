@@ -6,6 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc && vite build",
+    "icons:sync": "node scripts/sync-icons.mjs",
+    "release:check": "npm test && npm run build && cargo test --manifest-path src-tauri/Cargo.toml",
+    "release:portable": "tauri build --no-bundle && node scripts/build-portable.mjs",
+    "release:update:prep": "node scripts/build-updater-config.mjs",
+    "release:update:win": "npm run release:update:prep && tauri build --config src-tauri/tauri.updater.generated.json",
+    "release:win": "tauri build",
+    "signer:generate": "tauri signer generate -- -w $env:USERPROFILE/.tauri/umbra.key",
     "test": "vitest run",
     "test:watch": "vitest",
     "preview": "vite preview",

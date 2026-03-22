@@ -25,10 +25,13 @@ defineEmits(["click"]);
 .neon-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  font-family: "Iceland", monospace;
-  letter-spacing: 0.08em;
-  border-radius: 6px;
+  min-height: 34px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  border-radius: var(--radius-sm);
   border: 1px solid currentColor;
   cursor: pointer;
   transition: all 0.15s;
@@ -37,14 +40,15 @@ defineEmits(["click"]);
 }
 
 .neon-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.56;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 /* Sizes */
-.sm { font-size: 11px; padding: 4px 10px; }
-.md, :not(.sm):not(.lg) { font-size: 12px; padding: 7px 14px; }
-.lg { font-size: 14px; padding: 10px 20px; }
+.sm { min-height: 32px; font-size: 11px; padding: 6px 12px; }
+.md, :not(.sm):not(.lg) { min-height: 38px; font-size: 12px; padding: 8px 14px; }
+.lg { min-height: 44px; font-size: 13px; padding: 10px 18px; }
 
 /* Variants */
 .primary, :not(.secondary):not(.danger) {
@@ -77,6 +81,27 @@ defineEmits(["click"]);
 
 .ghost {
   border-color: transparent;
+}
+
+:global([data-theme="light"]) .neon-btn.secondary,
+:global([data-theme="light"]) .neon-btn.ghost {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(15, 23, 42, 0.16);
+  color: rgba(15, 23, 42, 0.8);
+}
+
+:global([data-theme="light"]) .neon-btn.primary {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+:global([data-theme="light"]) .neon-btn:disabled {
+  background: rgba(248, 250, 252, 0.96);
+  border-color: rgba(15, 23, 42, 0.14);
+  color: rgba(15, 23, 42, 0.5);
+}
+
+:global([data-theme="light"]) .neon-btn.primary:not(:disabled):hover {
+  box-shadow: 0 8px 20px rgba(11, 114, 133, 0.12);
 }
 
 .btn-spinner {

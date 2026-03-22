@@ -35,7 +35,7 @@ describe("useAgentStore", () => {
     mockInvoke.mockResolvedValueOnce(agents);
 
     const store = useAgentStore();
-    await store.loadAgents();
+    await store.loadAgents(true);
 
     expect(store.agents).toHaveLength(2);
     expect(store.loading).toBe(false);
@@ -46,7 +46,7 @@ describe("useAgentStore", () => {
     mockInvoke.mockRejectedValueOnce(new Error("Connection refused"));
 
     const store = useAgentStore();
-    await store.loadAgents();
+    await store.loadAgents(true);
 
     expect(store.agents).toHaveLength(0);
     expect(store.error).toContain("Connection refused");

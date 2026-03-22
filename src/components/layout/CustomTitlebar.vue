@@ -1,36 +1,52 @@
 <template>
   <div class="titlebar" data-tauri-drag-region>
-    <div class="titlebar-logo" data-tauri-drag-region>
-      <span class="logo-text">UMBRA</span>
-      <span class="logo-sub">MISSION CONTROL</span>
+    <div class="titlebar-copy" data-tauri-drag-region>
+      <p class="titlebar-kicker">umbra</p>
+      <div class="titlebar-line">
+        <span class="titlebar-title">mission control</span>
+        <span class="titlebar-dot" />
+        <span class="titlebar-sub">desktop orchestrator</span>
+      </div>
     </div>
     <div class="titlebar-controls">
-      <button class="ctrl-btn minimize" title="Minimieren" @click="minimize">─</button>
-      <button class="ctrl-btn maximize" title="Maximieren" @click="toggleMaximize">□</button>
-      <button class="ctrl-btn close" title="Schließen" @click="closeWindow">✕</button>
+      <button class="ctrl-btn" title="Minimieren" @click="minimize">
+        <span>-</span>
+      </button>
+      <button class="ctrl-btn" title="Maximieren" @click="toggleMaximize">
+        <span>[]</span>
+      </button>
+      <button class="ctrl-btn close" title="Schliessen" @click="closeWindow">
+        <span>x</span>
+      </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-// getCurrentWindow() only works inside Tauri — guard for browser dev preview
+import { getCurrentWindow } from "@tauri-apps/api/window";
+
 const isTauri = Boolean((window as any).__TAURI_INTERNALS__);
 
 async function minimize() {
   if (!isTauri) return;
-  const { getCurrentWindow } = await import("@tauri-apps/api/window");
   await getCurrentWindow().minimize();
 }
+
 async function toggleMaximize() {
   if (!isTauri) return;
-  const { getCurrentWindow } = await import("@tauri-apps/api/window");
   const win = getCurrentWindow();
   const maximized = await win.isMaximized();
-  if (maximized) win.unmaximize(); else win.maximize();
+
+  if (maximized) {
+    await win.unmaximize();
+    return;
+  }
+
+  await win.maximize();
 }
+
 async function closeWindow() {
   if (!isTauri) return;
-  const { getCurrentWindow } = await import("@tauri-apps/api/window");
   await getCurrentWindow().close();
 }
 </script>
@@ -38,65 +54,86 @@ async function closeWindow() {
 <style scoped>
 .titlebar {
   height: var(--titlebar-height);
-  background: rgba(5, 5, 12, 0.95);
-  border-bottom: 1px solid var(--glass-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0 12px 0 16px;
-  flex-shrink: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--glass-border) 88%, transparent);
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--bg-secondary) 92%, transparent), color-mix(in srgb, var(--bg-primary) 96%, transparent));
   user-select: none;
   -webkit-user-select: none;
 }
 
-.titlebar-logo {
+.titlebar-copy {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.titlebar-kicker,
+.titlebar-sub,
+.ctrl-btn {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.titlebar-kicker,
+.titlebar-sub {
+  color: var(--text-muted);
+}
+
+.titlebar-line {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
-.logo-text {
-  font-family: "Iceland", monospace;
-  font-size: 16px;
-  color: var(--accent-ember);
-  text-shadow: 0 0 8px var(--accent-ember-dim);
-  letter-spacing: 0.15em;
+.titlebar-title {
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: lowercase;
 }
 
-.logo-sub {
-  font-family: "Iceland", monospace;
-  font-size: 10px;
-  color: var(--text-muted);
-  letter-spacing: 0.2em;
+.titlebar-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 72%, transparent);
 }
 
 .titlebar-controls {
   display: flex;
-  gap: 4px;
+  gap: 6px;
 }
 
 .ctrl-btn {
-  width: 28px;
+  width: 30px;
   height: 24px;
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 12px;
-  border-radius: 4px;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s, color 0.15s;
+  border: 1px solid color-mix(in srgb, var(--glass-border) 84%, transparent);
+  border-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--glass-bg) 92%, transparent);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease;
 }
 
 .ctrl-btn:hover {
-  background: var(--bg-surface-hover);
+  border-color: color-mix(in srgb, var(--accent) 24%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
   color: var(--text-primary);
 }
 
 .ctrl-btn.close:hover {
-  background: rgba(255, 45, 85, 0.25);
+  border-color: rgba(239, 68, 68, 0.28);
+  background: rgba(239, 68, 68, 0.12);
   color: var(--accent-error);
 }
 </style>

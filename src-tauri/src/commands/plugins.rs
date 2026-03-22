@@ -202,6 +202,10 @@ pub struct SkillInfo {
     pub name: String,
     pub version: String,
     pub description: String,
+    pub category: String,
+    pub agents: Vec<String>,
+    pub content: String,
+    pub folder: String,
 }
 
 fn parse_skill_md(content: &str) -> (String, String) {
@@ -249,6 +253,48 @@ fn parse_skill_md(content: &str) -> (String, String) {
     (name, desc)
 }
 
+fn infer_skill_category(skills_dir: &std::path::Path, skill_dir: &std::path::Path) -> String {
+    let Ok(relative) = skill_dir.strip_prefix(skills_dir) else {
+        return "core".into();
+    };
+    let mut components = relative.components();
+    let Some(first) = components.next() else {
+        return "core".into();
+    };
+    let first = first.as_os_str().to_string_lossy().into_owned();
+    if components.next().is_none() {
+        "core".into()
+    } else {
+        first.trim_start_matches('.').to_string()
+    }
+}
+
+fn infer_skill_agents(name: &str, description: &str, content: &str) -> Vec<String> {
+    let haystack = format!("{name}\n{description}\n{content}").to_lowercase();
+    let mut agents = Vec::new();
+
+    let forge_terms = ["web", "frontend", "vue", "react", "openai", "full-stack", "api"];
+    if forge_terms.iter().any(|term| haystack.contains(term)) {
+        agents.push("forge".to_string());
+    }
+
+    let prism_terms = ["godot", "game", "gdscript", "scene", "animation", "physics"];
+    if prism_terms.iter().any(|term| haystack.contains(term)) {
+        agents.push("prism".to_string());
+    }
+
+    let jim_terms = ["shell", "powershell", "ops", "ci", "ship", "debug", "monitor", "cron"];
+    if jim_terms.iter().any(|term| haystack.contains(term)) {
+        agents.push("jim".to_string());
+    }
+
+    if agents.is_empty() {
+        agents.push("forge".to_string());
+    }
+
+    agents
+}
+
 #[tauri::command]
 pub async fn list_skills() -> std::result::Result<Vec<SkillInfo>, String> {
     let home = std::env::var("USERPROFILE")
@@ -276,16 +322,31 @@ pub async fn list_skills() -> std::result::Result<Vec<SkillInfo>, String> {
             .trim()
             .to_string();
 
-        // Parse SKILL.md
-        let (mut name, description) = std::fs::read_to_string(path.join("SKILL.md"))
-            .map(|c| parse_skill_md(&c))
-            .unwrap_or_default();
+        let content = std::fs::read_to_string(path.join("SKILL.md")).unwrap_or_default();
+        let (mut name, description) = parse_skill_md(&content);
 
         if name.is_empty() {
             name = id.clone();
         }
 
-        skills.push(SkillInfo { id, name, version, description });
+        let category = infer_skill_category(&skills_dir, &path);
+        let agents = infer_skill_agents(&name, &description, &content);
+        let folder = path
+            .strip_prefix(&skills_dir)
+            .unwrap_or(&path)
+            .to_string_lossy()
+            .replace('\\', "/");
+
+        skills.push(SkillInfo {
+            id,
+            name,
+            version,
+            description,
+            category,
+            agents,
+            content,
+            folder,
+        });
     }
 
     skills.sort_by(|a, b| a.name.cmp(&b.name));

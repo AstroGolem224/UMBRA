@@ -6,12 +6,21 @@ use uuid::Uuid;
 use crate::commands::config::CronJobConfig;
 use crate::errors::AppError;
 use crate::state::AppState;
+use crate::types::AgentCronJob;
+use crate::uap::collect_all_cron_jobs;
 
 #[tauri::command]
 pub async fn list_cron_jobs(
     state: State<'_, AppState>,
 ) -> std::result::Result<Vec<CronJobConfig>, AppError> {
     Ok(state.config.read().await.cron_jobs.clone())
+}
+
+#[tauri::command]
+pub async fn list_agent_cron_jobs(
+    state: State<'_, AppState>,
+) -> std::result::Result<Vec<AgentCronJob>, AppError> {
+    Ok(collect_all_cron_jobs(&state.agent_registry).await)
 }
 
 #[tauri::command]

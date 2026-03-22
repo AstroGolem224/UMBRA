@@ -9,6 +9,7 @@ export const useTaskStore = defineStore("tasks", () => {
   const loading = ref(false);
   const error = ref<string | null>(null);
   const lastSync = ref<string | null>(null);
+  let _listenUnlisten: (() => void) | null = null;
 
   async function fetchTasks() {
     loading.value = true;
@@ -23,11 +24,16 @@ export const useTaskStore = defineStore("tasks", () => {
     }
   }
 
-  function setupLiveUpdates() {
-    listen<Task[]>("tasks-updated", (event) => {
-      tasks.value = event.payload;
-      lastSync.value = new Date().toISOString();
-    });
+  async function setupLiveUpdates() {
+    if (_listenUnlisten) return; // already registered
+    try {
+      _listenUnlisten = await listen<Task[]>("tasks-updated", (event) => {
+        tasks.value = event.payload;
+        lastSync.value = new Date().toISOString();
+      });
+    } catch {
+      // Tauri event API not available (e.g. browser dev mode)
+    }
   }
 
   const activeTasks = () => tasks.value.filter((t) => t.status === "in-progress");
