@@ -3,6 +3,13 @@ import { ref, computed } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import type { Note, NoteCategory } from "@/interfaces";
 
+function generateNoteId() {
+  if (typeof globalThis.crypto?.randomUUID === "function") {
+    return globalThis.crypto.randomUUID();
+  }
+  return `note-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export const useNotesStore = defineStore("notes", () => {
   const notes = ref<Note[]>([]);
   const activeNoteId = ref<string | null>(null);
@@ -66,7 +73,7 @@ export const useNotesStore = defineStore("notes", () => {
 
   function newNote(category: NoteCategory = "misc"): Note {
     const note: Note = {
-      id: crypto.randomUUID(),
+      id: generateNoteId(),
       title: "",
       content: "",
       category,

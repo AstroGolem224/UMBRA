@@ -1,24 +1,35 @@
 <template>
   <div class="note-editor">
     <div class="editor-toolbar">
+      <div class="toolbar-head">
+        <input
+          v-model="localTitle"
+          class="title-input glass-input"
+          placeholder="note title..."
+          @input="emitChange"
+        />
+        <div class="toolbar-actions">
+          <select v-model="localCategory" class="category-select glass-input" @change="emitChange">
+            <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
+          </select>
+          <NeonButton variant="primary" size="sm" :loading="saving" @click="$emit('save')">save</NeonButton>
+          <NeonButton v-if="note.id" variant="danger" size="sm" ghost @click="$emit('delete')">delete</NeonButton>
+        </div>
+      </div>
+
       <input
-        v-model="localTitle"
-        class="title-input glass-input"
-        placeholder="Note title..."
+        v-model="localTags"
+        class="tags-input glass-input"
+        placeholder="tags, comma separated..."
         @input="emitChange"
       />
-      <select v-model="localCategory" class="category-select glass-input" @change="emitChange">
-        <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
-      </select>
-      <NeonButton variant="primary" size="sm" :loading="saving" @click="$emit('save')">SAVE</NeonButton>
-      <NeonButton v-if="note.id" variant="danger" size="sm" ghost @click="$emit('delete')">DELETE</NeonButton>
     </div>
 
     <div class="editor-panes">
       <textarea
         v-model="localContent"
         class="editor-pane raw-editor glass-input"
-        placeholder="Write markdown here..."
+        placeholder="write markdown here..."
         spellcheck="false"
         @input="emitChange"
       />
@@ -27,23 +38,27 @@
 
     <div class="editor-meta">
       <span v-if="note.updatedAt" class="meta-text">
-        Last saved: {{ new Date(note.updatedAt).toLocaleString() }}
+        last saved: {{ new Date(note.updatedAt).toLocaleString() }}
       </span>
-      <span v-if="note.filePath" class="meta-text">{{ note.filePath }}</span>
+      <span v-if="autosaving" class="meta-text accent">autosaving...</span>
+      <span v-else-if="autosaveState" class="meta-text accent">{{ autosaveState }}</span>
+      <span v-if="note.filePath" class="meta-text path">{{ note.filePath }}</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
-import { marked } from "marked";
+import { computed, ref, watch } from "vue";
 import DOMPurify from "dompurify";
+import { marked } from "marked";
 import type { Note, NoteCategory } from "@/interfaces";
 import NeonButton from "@/components/ui/NeonButton.vue";
 
 const props = defineProps<{
   note: Note;
   saving?: boolean;
+  autosaving?: boolean;
+  autosaveState?: string | null;
 }>();
 
 const emit = defineEmits<{
@@ -57,6 +72,7 @@ const categories: NoteCategory[] = ["prompts", "cli", "agents", "skills", "misc"
 const localTitle = ref(props.note.title);
 const localContent = ref(props.note.content);
 const localCategory = ref<NoteCategory>(props.note.category);
+const localTags = ref((props.note.tags ?? []).join(", "));
 
 watch(
   () => props.note,
@@ -64,12 +80,14 @@ watch(
     localTitle.value = n.title;
     localContent.value = n.content;
     localCategory.value = n.category;
+    localTags.value = (n.tags ?? []).join(", ");
   }
 );
 
 const renderedHtml = computed(() => {
-  const raw = marked.parse(localContent.value ?? "") as string;
-  return DOMPurify.sanitize(raw);
+  const raw = marked.parse(localContent.value ?? "");
+  const html = typeof raw === "string" ? raw : "";
+  return DOMPurify.sanitize(html);
 });
 
 function emitChange() {
@@ -77,6 +95,7 @@ function emitChange() {
     title: localTitle.value,
     content: localContent.value,
     category: localCategory.value,
+    tags: localTags.value.split(",").map((tag) => tag.trim()).filter(Boolean),
   });
 }
 </script>
@@ -89,31 +108,53 @@ function emitChange() {
   gap: 12px;
 }
 
+.editor-toolbar,
+.editor-meta {
+  flex-shrink: 0;
+}
+
 .editor-toolbar {
   display: flex;
+  flex-direction: column;
   gap: 8px;
+}
+
+.toolbar-head {
+  display: flex;
+  gap: 10px;
   align-items: center;
-  flex-shrink: 0;
 }
 
 .title-input {
   flex: 1;
-  font-family: "Iceland", monospace;
+  min-width: 0;
   font-size: 14px;
-  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+.tags-input {
+  width: 100%;
+  font-size: 12px;
+  font-family: var(--font-mono), monospace;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
 }
 
 .category-select {
-  font-family: "Iceland", monospace;
+  min-width: 130px;
   font-size: 12px;
-  letter-spacing: 0.08em;
-  padding: 6px 10px;
+  padding: 9px 12px;
   background: var(--glass-bg);
   color: var(--text-primary);
-  border: 1px solid var(--glass-border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
 }
+
 .category-select option {
   background: var(--bg-surface);
 }
@@ -127,61 +168,130 @@ function emitChange() {
 }
 
 .editor-pane {
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   overflow-y: auto;
+  border: 1px solid color-mix(in srgb, var(--glass-border) 86%, transparent);
+  background: color-mix(in srgb, var(--glass-bg) 82%, transparent);
 }
 
 .raw-editor {
-  font-family: "JetBrains Mono", "Consolas", monospace;
-  font-size: 13px;
-  line-height: 1.6;
   resize: none;
   padding: 14px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.65;
   color: var(--text-primary);
 }
 
 .preview {
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  padding: 14px;
-  font-size: 13px;
+  padding: 18px 20px;
+  font-family: var(--font-sans);
+  font-size: 14px;
   line-height: 1.7;
   color: var(--text-secondary);
 }
 
-.preview :deep(h1),
-.preview :deep(h2),
-.preview :deep(h3) {
-  font-family: "Iceland", monospace;
+.preview :deep(h1) {
+  margin: 0 0 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid color-mix(in srgb, var(--glass-border) 84%, transparent);
   color: var(--text-primary);
-  letter-spacing: 0.08em;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.preview :deep(h2) {
+  margin: 20px 0 10px;
+  color: var(--text-primary);
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.preview :deep(h3) {
+  margin: 16px 0 8px;
+  color: var(--text-primary);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.preview :deep(p) {
+  margin: 0 0 12px;
+}
+
+.preview :deep(ul),
+.preview :deep(ol) {
+  margin: 0 0 12px;
+  padding-left: 22px;
+}
+
+.preview :deep(li) {
+  margin: 3px 0;
+}
+
+.preview :deep(strong) {
+  color: var(--text-primary);
+  font-weight: 700;
 }
 
 .preview :deep(code) {
-  background: var(--bg-surface);
-  padding: 1px 5px;
-  border-radius: 3px;
+  background: color-mix(in srgb, var(--bg-elevated) 64%, transparent);
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
   font-size: 12px;
   color: var(--accent);
 }
 
 .preview :deep(pre) {
-  background: var(--bg-surface);
-  padding: 12px;
-  border-radius: 6px;
-  border-left: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--bg-elevated) 72%, transparent);
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid color-mix(in srgb, var(--glass-border) 84%, transparent);
   overflow-x: auto;
 }
 
 .editor-meta {
   display: flex;
   justify-content: space-between;
-  flex-shrink: 0;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .meta-text {
-  font-size: 10px;
   color: var(--text-muted);
-  letter-spacing: 0.06em;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.meta-text.accent {
+  color: var(--accent);
+}
+
+.meta-text.path {
+  font-family: var(--font-mono);
+}
+
+:global([data-theme="light"]) .editor-pane {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+:global([data-theme="light"]) .preview {
+  color: rgba(15, 23, 42, 0.76);
+}
+
+:global([data-theme="light"]) .preview :deep(code),
+:global([data-theme="light"]) .preview :deep(pre) {
+  background: rgba(241, 245, 249, 0.92);
+}
+
+@media (max-width: 980px) {
+  .toolbar-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .editor-panes {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

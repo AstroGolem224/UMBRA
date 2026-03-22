@@ -1,138 +1,248 @@
 <template>
   <div class="plugins-view">
-    <header class="page-header">
-      <h1 class="page-title">INTEGRATIONS</h1>
-      <NeonButton size="sm" variant="secondary" ghost :loading="loading" @click="refresh">
-        ↺ REFRESH
-      </NeonButton>
-    </header>
-
-    <!-- Obsidian -->
-    <GlassCard class="plugin-card">
-      <div class="plugin-header">
-        <span class="plugin-icon">◈</span>
-        <div class="plugin-meta">
-          <h3 class="plugin-name">OBSIDIAN</h3>
-          <p class="plugin-desc">Local vault — note access via filesystem</p>
-        </div>
-        <span class="status-dot" :class="obsidian?.connected ? 'ok' : 'err'" />
-        <span class="status-label" :class="obsidian?.connected ? 'ok' : 'err'">
-          {{ obsidian?.connected ? 'CONNECTED' : obsidianError ? 'ERROR' : 'SCANNING…' }}
+    <ViewHero
+      kicker="modules"
+      title="Integrations"
+      subtitle="connected systems, broker signals and the next plugin layer for UMBRA."
+    >
+      <template #meta>
+        <span class="view-hero-pill">{{ brokerSuggestions.length ? `${brokerSuggestions.length} broker routes` : "broker waiting" }}</span>
+        <span class="view-hero-pill" :class="{ 'is-stale': loading }">
+          {{ loading ? "refreshing modules" : "module scan ready" }}
         </span>
-      </div>
+        <NeonButton size="sm" variant="secondary" ghost :loading="loading" @click="refresh">
+          refresh
+        </NeonButton>
+      </template>
+    </ViewHero>
 
-      <div v-if="obsidian?.connected" class="plugin-body">
-        <div class="stat-row">
-          <span class="stat-label">Vault</span>
-          <span class="stat-value mono">{{ shortPath(obsidian.vaultPath) }}</span>
+    <section class="plugin-grid">
+      <GlassCard class="plugin-card">
+        <div class="plugin-header">
+          <span class="plugin-icon">OB</span>
+          <div class="plugin-meta">
+            <h3 class="plugin-name">OBSIDIAN</h3>
+            <p class="plugin-desc">local vault access via filesystem</p>
+          </div>
+          <span class="status-pill" :class="obsidian?.connected ? 'ok' : 'err'">
+            {{ obsidian?.connected ? "CONNECTED" : obsidianError ? "ERROR" : "SCANNING" }}
+          </span>
         </div>
-        <div class="stat-row">
-          <span class="stat-label">Notes</span>
-          <span class="stat-value">{{ obsidian.totalNotes.toLocaleString() }}</span>
+
+        <div v-if="obsidian?.connected" class="plugin-body">
+          <div class="stat-row">
+            <span class="stat-label">vault</span>
+            <span class="stat-value mono">{{ shortPath(obsidian.vaultPath) }}</span>
+          </div>
+          <div class="stat-row">
+            <span class="stat-label">notes</span>
+            <span class="stat-value">{{ obsidian.totalNotes.toLocaleString() }}</span>
+          </div>
+          <div v-if="obsidian.recentNotes.length" class="recent-list">
+            <span class="stat-label">recent</span>
+            <ul>
+              <li v-for="note in obsidian.recentNotes" :key="note.name" class="recent-item">
+                <span class="recent-name">{{ note.name }}</span>
+                <span class="recent-time">{{ relTime(note.modified) }}</span>
+              </li>
+            </ul>
+          </div>
         </div>
-        <div v-if="obsidian.recentNotes.length" class="recent-list">
-          <span class="stat-label">Recent</span>
-          <ul>
-            <li v-for="n in obsidian.recentNotes" :key="n.name" class="recent-item">
-              <span class="recent-name">{{ n.name }}</span>
-              <span class="recent-time">{{ relTime(n.modified) }}</span>
+        <p v-else-if="obsidianError" class="plugin-error">{{ obsidianError }}</p>
+      </GlassCard>
+
+      <GlassCard class="plugin-card broker-card">
+        <div class="plugin-header">
+          <span class="plugin-icon">AB</span>
+          <div class="plugin-meta">
+            <h3 class="plugin-name">ASSIGNMENT BROKER</h3>
+            <p class="plugin-desc">recommends who should pick up which PM task next</p>
+          </div>
+          <span class="status-pill" :class="brokerSuggestions.length ? 'ok' : 'err'">
+            {{ brokerSuggestions.length ? "ACTIVE" : "WAITING FOR SIGNALS" }}
+          </span>
+        </div>
+
+        <div v-if="brokerSuggestions.length" class="plugin-body">
+          <article class="broker-feature">
+            <p class="broker-kicker">top route</p>
+            <h4 class="broker-title">{{ brokerSuggestions[0].task.title }}</h4>
+            <p class="broker-copy">
+              send to <strong>{{ brokerSuggestions[0].agent.name }}</strong> / {{ brokerSuggestions[0].agent.role || "generalist" }}
+            </p>
+            <div class="broker-reasons">
+              <span v-for="reason in brokerSuggestions[0].reasons" :key="reason" class="reason-pill">{{ reason }}</span>
+            </div>
+          </article>
+
+          <div class="broker-list">
+            <article v-for="item in brokerSuggestions.slice(1)" :key="`${item.task.id}-${item.agent.id}`" class="broker-item">
+              <div>
+                <p class="task-title">{{ item.task.title }}</p>
+                <p class="plugin-desc">{{ item.agent.name }} / {{ item.task.priority }}</p>
+              </div>
+              <span class="broker-score">{{ item.score }}</span>
+            </article>
+          </div>
+        </div>
+        <p v-else class="plugin-empty">
+          needs live agents plus non-completed PM tasks before it can suggest assignments.
+        </p>
+      </GlassCard>
+
+      <GlassCard class="plugin-card">
+        <div class="plugin-header">
+          <span class="plugin-icon">TM</span>
+          <div class="plugin-meta">
+            <h3 class="plugin-name">TM-LITE</h3>
+            <p class="plugin-desc">task ingestion from the obsidian vault tasks folder</p>
+          </div>
+          <span class="status-pill" :class="tmTasks !== null ? 'ok' : 'err'">
+            {{ tmTasks !== null ? "CONNECTED" : tmError ? "ERROR" : "LOADING" }}
+          </span>
+        </div>
+
+        <div v-if="tmTasks !== null" class="plugin-body">
+          <div class="stat-row">
+            <span class="stat-label">open tasks</span>
+            <span class="stat-value">{{ tmTasks.length }}</span>
+          </div>
+          <ul v-if="tmTasks.length" class="task-list">
+            <li v-for="task in tmTasks.slice(0, 6)" :key="task.id" class="task-item">
+              <span class="task-priority" :class="task.priority">o</span>
+              <span class="task-title">{{ task.title }}</span>
+              <span class="task-project">{{ task.project }}</span>
+            </li>
+          </ul>
+          <p v-else class="plugin-empty">no open tasks.</p>
+        </div>
+        <p v-else-if="tmError" class="plugin-error">{{ tmError }}</p>
+      </GlassCard>
+
+      <GlassCard class="plugin-card">
+        <div class="plugin-header">
+          <span class="plugin-icon">GH</span>
+          <div class="plugin-meta">
+            <h3 class="plugin-name">GITHUB</h3>
+            <p class="plugin-desc">repo health via the github api</p>
+          </div>
+          <span class="status-pill" :class="githubStore.repos.length ? 'ok' : 'err'">
+            {{ githubStore.repos.length ? "CONNECTED" : githubStore.loading ? "LOADING" : "NO DATA" }}
+          </span>
+        </div>
+
+        <div v-if="githubStore.repos.length" class="plugin-body">
+          <div class="stat-row">
+            <span class="stat-label">tracked repos</span>
+            <span class="stat-value">{{ githubStore.repos.length }}</span>
+          </div>
+          <ul class="task-list">
+            <li v-for="repo in githubStore.repos" :key="repo.id" class="task-item">
+              <span class="task-priority medium">+</span>
+              <span class="task-title">{{ repo.name }}</span>
+              <span class="task-project">{{ repo.openIssues }} issues</span>
             </li>
           </ul>
         </div>
-      </div>
-      <p v-else-if="obsidianError" class="plugin-error">{{ obsidianError }}</p>
-    </GlassCard>
+        <p v-else-if="!githubStore.loading" class="plugin-empty">
+          no repos loaded. set a github pat in settings and refresh.
+        </p>
+      </GlassCard>
 
-    <!-- TM-lite -->
-    <GlassCard class="plugin-card">
-      <div class="plugin-header">
-        <span class="plugin-icon">▣</span>
-        <div class="plugin-meta">
-          <h3 class="plugin-name">TM-LITE</h3>
-          <p class="plugin-desc">Task management — reads from Obsidian vault/Tasks/</p>
+      <GlassCard class="plugin-card roadmap-card">
+        <div class="plugin-header">
+          <span class="plugin-icon">NX</span>
+          <div class="plugin-meta">
+            <h3 class="plugin-name">NEXT PLUGINS</h3>
+            <p class="plugin-desc">the additions that would make UMBRA feel like real mission control</p>
+          </div>
         </div>
-        <span class="status-dot" :class="tmTasks !== null ? 'ok' : 'err'" />
-        <span class="status-label" :class="tmTasks !== null ? 'ok' : 'err'">
-          {{ tmTasks !== null ? 'CONNECTED' : tmError ? 'ERROR' : 'LOADING…' }}
-        </span>
-      </div>
 
-      <div v-if="tmTasks !== null" class="plugin-body">
-        <div class="stat-row">
-          <span class="stat-label">Open tasks</span>
-          <span class="stat-value">{{ tmTasks.length }}</span>
+        <div class="roadmap-grid">
+          <article v-for="plugin in roadmapPlugins" :key="plugin.name" class="roadmap-item">
+            <div class="roadmap-head">
+              <strong>{{ plugin.name }}</strong>
+              <span>{{ plugin.tag }}</span>
+            </div>
+            <p>{{ plugin.description }}</p>
+          </article>
         </div>
-        <ul v-if="tmTasks.length" class="task-list">
-          <li v-for="t in tmTasks.slice(0, 6)" :key="t.id" class="task-item">
-            <span class="task-priority" :class="t.priority">●</span>
-            <span class="task-title">{{ t.title }}</span>
-            <span class="task-project">{{ t.project }}</span>
-          </li>
-        </ul>
-        <p v-else class="plugin-empty">No open tasks.</p>
-      </div>
-      <p v-else-if="tmError" class="plugin-error">{{ tmError }}</p>
-    </GlassCard>
-
-    <!-- GitHub -->
-    <GlassCard class="plugin-card">
-      <div class="plugin-header">
-        <span class="plugin-icon">◉</span>
-        <div class="plugin-meta">
-          <h3 class="plugin-name">GITHUB</h3>
-          <p class="plugin-desc">Repo stats — api.github.com via PAT</p>
-        </div>
-        <span class="status-dot" :class="githubStore.repos.length ? 'ok' : 'err'" />
-        <span class="status-label" :class="githubStore.repos.length ? 'ok' : 'err'">
-          {{ githubStore.repos.length ? 'CONNECTED' : githubStore.loading ? 'LOADING…' : 'NO DATA' }}
-        </span>
-      </div>
-
-      <div v-if="githubStore.repos.length" class="plugin-body">
-        <div class="stat-row">
-          <span class="stat-label">Tracked repos</span>
-          <span class="stat-value">{{ githubStore.repos.length }}</span>
-        </div>
-        <ul class="task-list">
-          <li v-for="r in githubStore.repos" :key="r.id" class="task-item">
-            <span class="task-priority medium">◈</span>
-            <span class="task-title">{{ r.name }}</span>
-            <span class="task-project">{{ r.openIssues }} issues</span>
-          </li>
-        </ul>
-      </div>
-      <p v-else-if="!githubStore.loading" class="plugin-empty">
-        No repos loaded. Set a GitHub PAT in Settings → GITHUB.
-      </p>
-    </GlassCard>
+      </GlassCard>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import ViewHero from "@/components/layout/ViewHero.vue";
 import GlassCard from "@/components/ui/GlassCard.vue";
 import NeonButton from "@/components/ui/NeonButton.vue";
+import { buildAssignmentSuggestions } from "@/lib/assignment-broker";
+import { useAgentStore } from "@/stores/useAgentStore";
 import { useGithubStore } from "@/stores/useGithubStore";
+import { useTaskStore } from "@/stores/useTaskStore";
 
-interface RecentNote { name: string; modified: string }
-interface ObsidianStats { connected: boolean; totalNotes: number; recentNotes: RecentNote[]; vaultPath: string }
-interface TmTask { id: string; title: string; status: string; project: string; priority: string }
+interface RecentNote {
+  name: string;
+  modified: string;
+}
 
+interface ObsidianStats {
+  connected: boolean;
+  totalNotes: number;
+  recentNotes: RecentNote[];
+  vaultPath: string;
+}
+
+interface TmTask {
+  id: string;
+  title: string;
+  status: string;
+  project: string;
+  priority: string;
+}
+
+const agentStore = useAgentStore();
 const githubStore = useGithubStore();
+const taskStore = useTaskStore();
 
 const loading = ref(false);
 const obsidian = ref<ObsidianStats | null>(null);
 const obsidianError = ref<string | null>(null);
 const tmTasks = ref<TmTask[] | null>(null);
 const tmError = ref<string | null>(null);
+const roadmapPlugins = [
+  {
+    name: "release radar",
+    tag: "delivery",
+    description: "pulls commits, open prs and pm blockers into one release-ready lane with changelog hints.",
+  },
+  {
+    name: "build sentinel",
+    tag: "ops",
+    description: "ingests ci, test and crash signals so agents see breakage before they ship on top of it.",
+  },
+  {
+    name: "vault graph lens",
+    tag: "knowledge",
+    description: "maps notes, prompts and skills into reusable clusters instead of flat lists.",
+  },
+  {
+    name: "artifact watcher",
+    tag: "delivery",
+    description: "tracks exported builds, installers and release assets across local folders and ci.",
+  },
+];
+
+const brokerSuggestions = computed(() => buildAssignmentSuggestions(taskStore.tasks, agentStore.agents, 4));
 
 async function loadObsidian() {
   try {
     obsidian.value = await invoke<ObsidianStats>("get_obsidian_stats");
     obsidianError.value = null;
-  } catch (e) {
-    obsidianError.value = String(e);
+  } catch (error) {
+    obsidianError.value = String(error);
   }
 }
 
@@ -140,30 +250,38 @@ async function loadTm() {
   try {
     tmTasks.value = await invoke<TmTask[]>("get_tmlite_tasks");
     tmError.value = null;
-  } catch (e) {
+  } catch (error) {
     tmTasks.value = [];
-    tmError.value = String(e);
+    tmError.value = String(error);
   }
 }
 
 async function refresh() {
   loading.value = true;
-  await Promise.all([loadObsidian(), loadTm(), githubStore.loadRepos()]);
+  await Promise.all([
+    loadObsidian(),
+    loadTm(),
+    githubStore.loadRepos(),
+    agentStore.loadAgents(),
+    agentStore.setupLiveUpdates(),
+    taskStore.fetchTasks(),
+    taskStore.setupLiveUpdates(),
+  ]);
   loading.value = false;
 }
 
-function shortPath(p: string) {
-  const parts = p.replace(/\\/g, "/").split("/");
-  return parts.length > 3 ? "…/" + parts.slice(-2).join("/") : p;
+function shortPath(path: string) {
+  const parts = path.replace(/\\/g, "/").split("/");
+  return parts.length > 3 ? ".../" + parts.slice(-2).join("/") : path;
 }
 
 function relTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return `${Math.floor(h / 24)}d ago`;
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  return `${Math.floor(hours / 24)}d ago`;
 }
 
 onMounted(refresh);
@@ -171,45 +289,94 @@ onMounted(refresh);
 
 <style scoped>
 .plugins-view {
-  max-width: 720px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
-.page-header {
+.page-header,
+.plugin-header,
+.stat-row,
+.roadmap-head,
+.broker-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 8px;
+  gap: 12px;
+}
+
+.page-kicker,
+.plugin-desc,
+.broker-kicker,
+.status-pill,
+.stat-label,
+.task-project,
+.recent-time {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.page-kicker,
+.plugin-desc,
+.stat-label,
+.task-project,
+.recent-time {
+  color: var(--text-muted);
+}
+
+.page-title,
+.plugin-name,
+.broker-title {
+  margin: 0;
+  color: var(--text-primary);
+  font-family: var(--font-display);
 }
 
 .page-title {
-  font-family: var(--font-display), "Iceland", monospace;
-  font-size: 24px;
-  font-weight: 700;
-  letter-spacing: 0.2em;
-  color: var(--text-primary);
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.page-subtitle,
+.plugin-empty,
+.roadmap-item p,
+.broker-copy,
+.plugin-error {
   margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
-.plugin-card {
-  padding: 18px 20px;
-}
-
-.plugin-header {
-  display: flex;
-  align-items: center;
+.plugin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  margin-bottom: 14px;
+}
+
+.plugin-card,
+.plugin-body,
+.recent-list,
+.broker-feature,
+.broker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .plugin-icon {
-  font-size: 20px;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--accent);
-  width: 24px;
-  text-align: center;
-  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
 }
 
 .plugin-meta {
@@ -217,157 +384,175 @@ onMounted(refresh);
 }
 
 .plugin-name {
-  font-family: var(--font-display), "Iceland", monospace;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
-  letter-spacing: 0.15em;
-  color: var(--text-primary);
-  margin: 0 0 2px;
+  letter-spacing: 0.08em;
 }
 
-.plugin-desc {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin: 0;
+.status-pill,
+.reason-pill,
+.broker-score {
+  padding: 5px 9px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--glass-border) 88%, transparent);
+  background: color-mix(in srgb, var(--glass-bg) 82%, transparent);
 }
 
-.status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
+.status-pill.ok {
+  color: var(--accent-success);
 }
 
-.status-dot.ok { background: var(--accent-success); box-shadow: 0 0 6px var(--accent-success); }
-.status-dot.err { background: var(--accent-error); }
-
-.status-label {
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  font-family: var(--font-display), "Iceland", monospace;
-}
-
-.status-label.ok { color: var(--accent-success); }
-.status-label.err { color: var(--accent-error); }
-
-.plugin-body {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.stat-row {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
+.status-pill.err,
+.plugin-error {
+  color: var(--accent-error);
 }
 
 .stat-label {
-  font-size: 10px;
-  color: var(--text-muted);
-  letter-spacing: 0.1em;
   min-width: 80px;
-  flex-shrink: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
 }
 
-.stat-value {
-  font-size: 13px;
+.stat-value,
+.broker-title {
+  font-size: 14px;
   color: var(--text-primary);
 }
 
 .stat-value.mono {
-  font-family: var(--font-mono), monospace;
-  font-size: 11px;
-  color: var(--text-secondary);
-}
-
-.recent-list {
-  display: flex;
-  gap: 10px;
-  align-items: flex-start;
-}
-
-.recent-list ul {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  flex: 1;
-}
-
-.recent-item {
-  display: flex;
-  justify-content: space-between;
-  padding: 3px 0;
-  border-bottom: 1px solid var(--glass-border);
+  font-family: var(--font-mono);
   font-size: 11px;
 }
 
-.recent-name {
-  color: var(--text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 280px;
-}
-
-.recent-time {
-  color: var(--text-muted);
-  flex-shrink: 0;
-  margin-left: 12px;
-}
-
+.recent-list ul,
 .task-list {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-.task-item {
+.recent-item,
+.task-item,
+.broker-item {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 0;
-  border-bottom: 1px solid var(--glass-border);
-  font-size: 11px;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--glass-border) 84%, transparent);
 }
 
-.task-item:last-child { border-bottom: none; }
-
-.task-priority {
-  font-size: 8px;
-  flex-shrink: 0;
+.recent-item:last-child,
+.task-item:last-child,
+.broker-item:last-child {
+  border-bottom: none;
 }
 
-.task-priority.critical { color: #ff3333; }
-.task-priority.high     { color: var(--accent); }
-.task-priority.medium   { color: var(--accent-secondary); }
-.task-priority.low      { color: var(--text-muted); }
-
+.recent-name,
 .task-title {
-  flex: 1;
   color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.task-project {
-  font-size: 10px;
-  color: var(--text-muted);
+.task-item {
+  align-items: center;
+  font-size: 12px;
+}
+
+.task-priority {
+  width: 14px;
+  text-align: center;
   flex-shrink: 0;
 }
 
-.plugin-error {
-  font-size: 11px;
-  color: var(--accent-error);
-  font-family: var(--font-mono), monospace;
-  margin: 0;
+.task-priority.critical {
+  color: #ff3333;
 }
 
-.plugin-empty {
-  font-size: 11px;
+.task-priority.high {
+  color: var(--accent);
+}
+
+.task-priority.medium {
+  color: var(--accent-secondary);
+}
+
+.task-priority.low {
   color: var(--text-muted);
-  margin: 0;
-  font-style: italic;
+}
+
+.broker-card {
+  gap: 12px;
+}
+
+.broker-feature {
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--glass-border) 86%, transparent);
+  background: color-mix(in srgb, var(--bg-elevated) 34%, transparent);
+}
+
+.broker-copy strong {
+  color: var(--text-primary);
+}
+
+.broker-reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.reason-pill,
+.broker-score {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.roadmap-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.roadmap-item {
+  padding: 11px;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--glass-border) 84%, transparent);
+  background: color-mix(in srgb, var(--bg-elevated) 38%, transparent);
+}
+
+.roadmap-head {
+  align-items: baseline;
+  margin-bottom: 6px;
+  color: var(--text-primary);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.roadmap-head span {
+  color: var(--accent);
+  font-family: var(--font-mono);
+}
+
+:global([data-theme="light"]) .broker-feature,
+:global([data-theme="light"]) .roadmap-item {
+  background: rgba(248, 250, 252, 0.88);
+  border-color: rgba(15, 23, 42, 0.08);
+}
+
+:global([data-theme="light"]) .status-pill,
+:global([data-theme="light"]) .reason-pill,
+:global([data-theme="light"]) .broker-score {
+  background: rgba(255, 255, 255, 0.88);
+}
+
+@media (max-width: 960px) {
+  .plugin-grid,
+  .roadmap-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

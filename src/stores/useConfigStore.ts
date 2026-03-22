@@ -5,12 +5,21 @@ import type { AppConfig } from "@/interfaces";
 
 const defaults: AppConfig = {
   theme: "ember",
-  vaultPath: "D:/Obsidian/2nd-brain/2nd-brain",
+  vaultPath: "",
   notesSubdir: "UMBRA_Notes",
+  repoRootPath: "",
   launchTargets: [],
   githubTargets: [],
-  pmToolUrl: "http://100.115.61.30:8000",
+  pmToolUrl: "",
+  pmToolDashboardUrl: "",
   pmToolPollSeconds: 30,
+  updaterEndpoint: "",
+  updaterPublicKey: "",
+  autoCheckForUpdates: false,
+  uapAdvertiseHost: "127.0.0.1",
+  uapPort: 8765,
+  uapToken: "",
+  taskLanePrefs: {},
 };
 
 export const useConfigStore = defineStore("config", () => {

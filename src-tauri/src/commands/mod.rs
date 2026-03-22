@@ -6,3 +6,4 @@ pub mod integrations;
 pub mod launcher;
 pub mod notes;
 pub mod plugins;
+pub mod updates;

@@ -1,7 +1,9 @@
 node_modules/
 dist/
+dist-portable/
 src-tauri/target/
 src-tauri/gen/
+src-tauri/tauri.updater.generated.json
 *.log
 .DS_Store
 .gstack/

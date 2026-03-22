@@ -6,6 +6,60 @@ use crate::state::AppState;
 const CACHE_TTL: Duration = Duration::from_secs(300);
 const GITHUB_API: &str = "https://api.github.com";
 
+fn user_repos_url(pat: Option<&str>) -> Result<String, String> {
+    match pat.map(str::trim).filter(|token| !token.is_empty()) {
+        Some(_) => Ok(format!(
+            "{}/user/repos?per_page=100&sort=updated&affiliation=owner",
+            GITHUB_API
+        )),
+        None => Err("GitHub PAT required to list account repositories. Add one in Settings.".into()),
+    }
+}
+
+/// Fetch all repos owned by the authenticated user.
+#[tauri::command]
+pub async fn list_user_repos(state: State<'_, AppState>) -> Result<Vec<serde_json::Value>, String> {
+    let pat = {
+        let cfg = state.config.read().await;
+        cfg.github_pat.clone()
+    };
+
+    let client = reqwest::Client::builder()
+        .user_agent("UMBRA/1.0")
+        .timeout(Duration::from_secs(10))
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let url = user_repos_url(pat.as_deref())?;
+
+    let mut req = client.get(&url);
+    if let Some(token) = &pat {
+        if !token.is_empty() {
+            req = req.bearer_auth(token);
+        }
+    }
+
+    let resp = req.send().await.map_err(|e| e.to_string())?;
+    let repos: Vec<serde_json::Value> = resp.json().await.map_err(|e| e.to_string())?;
+
+    // Return minimal shape: name, full_name, html_url, private, description, pushed_at
+    let slim: Vec<serde_json::Value> = repos
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "name": r["name"],
+                "fullName": r["full_name"],
+                "htmlUrl": r["html_url"],
+                "private": r["private"],
+                "description": r["description"],
+                "pushedAt": r["pushed_at"],
+            })
+        })
+        .collect();
+
+    Ok(slim)
+}
+
 #[tauri::command]
 pub async fn get_github_repos(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
     // Check cache
@@ -91,4 +145,25 @@ pub async fn get_github_repos(state: State<'_, AppState>) -> Result<serde_json::
     }
 
     Ok(value)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn user_repo_listing_requires_pat() {
+        let err = user_repos_url(None).unwrap_err();
+        assert!(err.contains("GitHub PAT required"));
+    }
+
+    #[test]
+    fn user_repo_listing_uses_authenticated_endpoint() {
+        let url = user_repos_url(Some("ghp_test")).unwrap();
+        assert_eq!(
+            url,
+            "https://api.github.com/user/repos?per_page=100&sort=updated&affiliation=owner"
+        );
+        assert!(!url.contains("/users/"));
+    }
 }

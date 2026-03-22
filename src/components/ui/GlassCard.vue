@@ -16,9 +16,9 @@ defineEmits(["click"]);
 .glass-card {
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
-  border-radius: 12px;
-  backdrop-filter: blur(16px);
+  border-radius: var(--radius-lg);
   padding: 16px;
+  contain: layout style paint;
 }
 
 .glass-card.clickable {
@@ -39,5 +39,9 @@ defineEmits(["click"]);
 .glass-card.danger {
   border-color: var(--accent-error);
   box-shadow: 0 0 8px rgba(255, 50, 50, 0.15);
+}
+
+:global([data-theme="light"]) .glass-card.clickable:hover {
+  box-shadow: 0 10px 24px rgba(148, 163, 184, 0.16);
 }
 </style>

@@ -7,6 +7,8 @@ import { ref, onMounted, onUnmounted } from "vue";
 
 const canvasEl = ref<HTMLCanvasElement | null>(null);
 let rafId = 0;
+let lastFrameTime = 0;
+const FRAME_INTERVAL = 1000 / 20; // cap at 20fps — adequate for ambient particles
 let resizeObserver: ResizeObserver | null = null;
 let themeObserver: MutationObserver | null = null;
 let themeColors: string[] = ["#d4520a", "#c9972a", "#ff7b2e"];
@@ -23,7 +25,7 @@ interface Particle {
   colorIndex: number;
 }
 
-const PARTICLE_COUNT = 120;
+const PARTICLE_COUNT = 25;
 const particles: Particle[] = [];
 
 function readThemeColors() {
@@ -57,7 +59,13 @@ function initParticles(w: number, h: number) {
   }
 }
 
-function tick() {
+function tick(now = 0) {
+  if (now - lastFrameTime < FRAME_INTERVAL) {
+    rafId = requestAnimationFrame(tick);
+    return;
+  }
+  lastFrameTime = now;
+
   const canvas = canvasEl.value;
   if (!canvas) return;
   const ctx = canvas.getContext("2d");

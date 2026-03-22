@@ -1,9 +1,14 @@
 .glass-card {
   background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
   border: 1px solid var(--glass-border);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
+  contain: layout style paint;
+  box-shadow: 0 14px 28px rgba(2, 8, 23, 0.08);
+}
+
+/* backdrop-filter nur auf permanenten Containern (Sidebar, Titlebar) */
+.glass-panel {
+  will-change: transform;
 }
 
 .glass-panel {
@@ -16,14 +21,24 @@
 .glass-input {
   background: var(--bg-surface);
   border: 1px solid var(--glass-border);
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   color: var(--text-primary);
-  font-family: "Iceland", monospace;
-  font-size: 14px;
-  padding: 8px 12px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  padding: 9px 12px;
+  min-height: 38px;
   outline: none;
   transition: border-color 0.2s;
   width: 100%;
+}
+
+textarea.glass-input {
+  min-height: 0;
+  line-height: 1.55;
+}
+
+select.glass-input {
+  line-height: 1.2;
 }
 
 .glass-input:focus {
@@ -33,4 +48,16 @@
 
 .glass-input::placeholder {
   color: var(--text-muted);
+}
+
+[data-theme="light"] .glass-input {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(15, 23, 42, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+[data-theme="light"] .glass-card {
+  background: rgba(255, 255, 255, 0.93);
+  border-color: rgba(15, 23, 42, 0.1);
+  box-shadow: 0 12px 24px rgba(148, 163, 184, 0.12);
 }
