@@ -418,4 +418,5 @@ export interface AppConfig {
   agentNotes?: Record<string, AgentNote>;
   agentAuthTokens?: Record<string, string>;
   customAgents?: CustomAgentConfig[];
+  agentProviderMap?: Record<string, string>;
 }

@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
@@ -609,7 +610,10 @@ async fn create_run_with_events(
 ) -> std::result::Result<DispatchRun, AppError> {
     let validated = validate_create_input(&input, state).await?;
     let continue_from_run_id = validated.continue_from_run_id.clone();
-    let provider_id = derive_provider_id(&validated.agent_id);
+    let provider_id = {
+        let cfg = state.config.read().await;
+        derive_provider_id_with_map(&validated.agent_id, Some(&cfg.agent_provider_map))
+    };
     let (run, first_event) = state
         .workbench_store
         .create_run(validated, provider_id)
@@ -674,7 +678,10 @@ pub(crate) async fn validate_create_input(
         )));
     }
 
-    let provider_id = derive_provider_id(&input.agent_id);
+    let provider_id = {
+        let cfg = state.config.read().await;
+        derive_provider_id_with_map(&input.agent_id, Some(&cfg.agent_provider_map))
+    };
     if !workspace.allowed_providers.is_empty()
         && !workspace
             .allowed_providers
@@ -770,7 +777,21 @@ pub(crate) async fn validate_create_input(
 }
 
 pub(crate) fn derive_provider_id(agent_id: &str) -> String {
+    derive_provider_id_with_map(agent_id, None)
+}
+
+pub(crate) fn derive_provider_id_with_map(
+    agent_id: &str,
+    agent_provider_map: Option<&HashMap<String, String>>,
+) -> String {
     let normalized = agent_id.trim().to_lowercase();
+    // 1. Check explicit mapping first
+    if let Some(map) = agent_provider_map {
+        if let Some(provider) = map.get(&normalized) {
+            return provider.clone();
+        }
+    }
+    // 2. Fallback to prefix heuristic
     if normalized.starts_with("codex") {
         "codex".into()
     } else if normalized.starts_with("claude") {
@@ -872,7 +893,7 @@ fn provider_agent_ids(config: &crate::commands::config::AppConfig, provider_id: 
     let mut ids = vec!["forge".to_string(), "prism".to_string()];
     ids.extend(config.custom_agents.iter().map(|agent| agent.id.clone()));
     ids.into_iter()
-        .filter(|agent_id| derive_provider_id(agent_id) == provider_id)
+        .filter(|agent_id| derive_provider_id_with_map(agent_id, Some(&config.agent_provider_map)) == provider_id)
         .collect()
 }
 

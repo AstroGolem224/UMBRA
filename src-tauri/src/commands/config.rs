@@ -116,6 +116,10 @@ pub struct AppConfig {
     pub agent_auth_tokens: HashMap<String, String>,
     #[serde(default)]
     pub custom_agents: Vec<CustomAgentConfig>,
+    /// Explicit agent-id → provider-id mapping. Overrides the name-prefix heuristic.
+    /// Example: { "forge": "claude", "prism": "gemini" }
+    #[serde(default = "default_agent_provider_map")]
+    pub agent_provider_map: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
@@ -189,6 +193,13 @@ fn default_uap_port() -> u16 {
 
 fn default_uap_token() -> String {
     Uuid::new_v4().to_string()
+}
+
+fn default_agent_provider_map() -> HashMap<String, String> {
+    let mut m = HashMap::new();
+    m.insert("forge".into(), "claude".into());
+    m.insert("prism".into(), "gemini".into());
+    m
 }
 
 impl AppConfig {
@@ -544,6 +555,7 @@ impl Default for AppConfig {
             agent_notes: HashMap::new(),
             agent_auth_tokens: normalize_agent_auth_tokens(HashMap::new(), &[]),
             custom_agents: vec![],
+            agent_provider_map: default_agent_provider_map(),
         }
     }
 }
