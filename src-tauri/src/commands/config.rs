@@ -600,7 +600,7 @@ pub async fn save_config(
     config: AppConfig,
     state: State<'_, AppState>,
 ) -> std::result::Result<(), AppError> {
-    let mut normalized = config.normalize();
+    let normalized = config.normalize();
 
     // Store GitHub PAT in OS credential store, keep only a marker in config
     if let Some(pat) = &normalized.github_pat {

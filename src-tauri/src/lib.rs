@@ -55,6 +55,17 @@ use types::{Agent, AgentStatus};
 use uap::{start_uap_server, AgentRegistry};
 
 fn config_path() -> PathBuf {
+    // Portable mode: if config.json or a "portable" marker exists next to the exe,
+    // store all data alongside the executable instead of %APPDATA%.
+    if let Some(exe_dir) = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| d.to_path_buf()))
+    {
+        if exe_dir.join("config.json").exists() || exe_dir.join("portable").exists() {
+            return exe_dir.join("config.json");
+        }
+    }
+
     let app_data = std::env::var("APPDATA").unwrap_or_else(|_| ".".into());
     PathBuf::from(app_data).join("umbra").join("config.json")
 }
