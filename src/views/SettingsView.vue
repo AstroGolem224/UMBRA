@@ -1,22 +1,49 @@
 <template>
-  <div class="settings-view">
-    <ViewHero
-      kicker="configuration"
-      title="Settings"
-      subtitle="theme, vault, launch targets and external service settings."
-    >
-      <template #meta>
-        <span class="view-hero-pill">{{ draft.theme }} active</span>
-        <span class="view-hero-pill">{{ draft.closeToTray ? "close hides" : "close exits" }}</span>
-        <span class="view-hero-pill">{{ draft.pmToolPollSeconds }}s pm poll</span>
-      </template>
-    </ViewHero>
+  <div class="settings-layout">
+    <!-- ── Left navigation ── -->
+    <nav class="settings-nav">
+      <div class="nav-brand">
+        <span class="nav-kicker">configuration</span>
+        <h1 class="nav-title">Settings</h1>
+      </div>
 
-    <form class="settings-form" @submit.prevent="save">
-      <GlassCard>
-        <h3 class="card-title">appearance</h3>
-        <div class="field">
-          <label class="field-label">theme</label>
+      <div class="nav-items">
+        <button
+          v-for="sec in sections"
+          :key="sec.id"
+          class="nav-item"
+          :class="{ active: activeSection === sec.id }"
+          type="button"
+          @click="activeSection = sec.id"
+        >
+          <span class="nav-icon">{{ sec.icon }}</span>
+          <span class="nav-label">{{ sec.label }}</span>
+        </button>
+      </div>
+
+      <div class="nav-footer">
+        <NeonButton type="button" variant="primary" :loading="saving" @click="save">
+          Save settings
+        </NeonButton>
+        <Transition name="fade">
+          <span v-if="saved" class="saved-badge">✓ Saved</span>
+        </Transition>
+      </div>
+    </nav>
+
+    <!-- ── Content panel ── -->
+    <main class="settings-content">
+
+      <!-- ══ Appearance ══ -->
+      <section v-show="activeSection === 'appearance'" class="settings-section">
+        <div class="section-header">
+          <h2 class="section-title">Appearance</h2>
+          <p class="section-desc">Choose how UMBRA looks and behaves when you minimize or close it.</p>
+        </div>
+
+        <GlassCard>
+          <div class="group-title">Color theme</div>
+          <p class="group-desc">Pick a color scheme for the entire app. Changes apply instantly — no need to save.</p>
           <div class="theme-swatches">
             <button
               v-for="t in themes"
@@ -30,310 +57,354 @@
               {{ t.label }}
             </button>
           </div>
-        </div>
-      </GlassCard>
+        </GlassCard>
 
-      <GlassCard>
-        <h3 class="card-title">system tray</h3>
-        <label class="checkbox-row">
-          <input v-model="draft.closeToTray" type="checkbox" />
-          <span>hide to tray when the main window is closed</span>
-        </label>
-        <p class="field-hint">
-          tray menu exposes `show`, `hide`, `sync pm now`, and `quit`. when this is off, the window close button exits the app normally.
-        </p>
-        <label class="checkbox-row" style="margin-top: 12px">
-          <input v-model="autostart" type="checkbox" @change="toggleAutostart" />
-          <span>start UMBRA automatically when you log in</span>
-        </label>
-        <p class="field-hint">
-          launches minimized in the system tray. uses the OS native autostart mechanism.
-        </p>
-      </GlassCard>
+        <GlassCard>
+          <div class="group-title">Window behavior</div>
 
-      <GlassCard>
-        <h3 class="card-title">obsidian vault</h3>
-        <div class="field">
-          <label class="field-label">vault path</label>
-          <input v-model="draft.vaultPath" class="field-input glass-input" type="text" />
-        </div>
-        <div class="field">
-          <label class="field-label">notes subdirectory</label>
-          <input v-model="draft.notesSubdir" class="field-input glass-input" type="text" placeholder="UMBRA_Notes" />
-        </div>
-      </GlassCard>
-
-      <GlassCard>
-        <h3 class="card-title">launch targets</h3>
-        <div v-for="(target, i) in draft.launchTargets" :key="i" class="launch-row">
-          <input v-model="target.name" class="glass-input launch-name" placeholder="name" />
-          <input v-model="target.path" class="glass-input launch-path" placeholder="executable path" />
-          <NeonButton variant="danger" size="sm" ghost @click="draft.launchTargets!.splice(i, 1)">delete</NeonButton>
-        </div>
-        <NeonButton size="sm" variant="secondary" @click="addLaunchTarget">+ add target</NeonButton>
-      </GlassCard>
-
-      <GlassCard>
-        <h3 class="card-title">workspaces</h3>
-        <div v-for="(workspace, index) in draft.workspacePresets" :key="workspace.id" class="workspace-card">
-          <div class="workspace-row__head">
-            <input v-model="workspace.name" class="glass-input workspace-name" placeholder="workspace name" />
-            <label class="checkbox-row compact">
-              <input v-model="workspace.writable" type="checkbox" />
-              <span>writable</span>
-            </label>
-            <label class="checkbox-row compact">
-              <input
-                :checked="draft.defaultWorkspaceId === workspace.id"
-                type="radio"
-                name="default-workspace"
-                @change="draft.defaultWorkspaceId = workspace.id"
-              />
-              <span>default</span>
-            </label>
-            <NeonButton variant="danger" size="sm" ghost @click="draft.workspacePresets.splice(index, 1)">delete</NeonButton>
-          </div>
-          <div class="grant-row">
-            <input v-model="workspace.rootPath" class="glass-input" placeholder="absolute workspace path" />
-            <NeonButton size="sm" variant="secondary" ghost @click="pickWorkspaceRoot(index)">pick folder</NeonButton>
-          </div>
-          <div class="workspace-grid">
-            <label class="field">
-              <label class="field-label">allowed providers</label>
-              <input
-                :value="workspaceProvidersValue(workspace)"
-                class="glass-input"
-                placeholder="codex, claude"
-                @input="setWorkspaceProviders(workspace, ($event.target as HTMLInputElement).value)"
-              />
-            </label>
-            <label class="field">
-              <label class="field-label">allowed agents</label>
-              <input
-                :value="workspaceAgentsValue(workspace)"
-                class="glass-input"
-                placeholder="codex-main, claude-main"
-                @input="setWorkspaceAgents(workspace, ($event.target as HTMLInputElement).value)"
-              />
+          <div class="setting-row">
+            <div class="setting-copy">
+              <span class="setting-label">Keep running when closed</span>
+              <span class="setting-hint">Closing the window hides UMBRA to the system tray instead of quitting. Right-click the tray icon to show, hide, or quit.</span>
+            </div>
+            <label class="toggle">
+              <input v-model="draft.closeToTray" type="checkbox" />
+              <span class="toggle-track" />
             </label>
           </div>
-        </div>
-        <div class="workspace-actions">
-          <NeonButton size="sm" variant="secondary" @click="addWorkspacePreset">+ add workspace</NeonButton>
-          <NeonButton size="sm" variant="secondary" ghost @click="seedWorkspaceGrantRoots">grant current workspaces</NeonButton>
-        </div>
-        <div class="field">
-          <label class="field-label">workspace grant roots</label>
-          <div v-for="(root, index) in draft.workspaceGrantRoots" :key="`${root}-${index}`" class="grant-row">
-            <input v-model="draft.workspaceGrantRoots[index]" class="glass-input" placeholder="allowed root path" />
-            <NeonButton size="sm" variant="secondary" ghost @click="pickGrantRoot(index)">pick folder</NeonButton>
-            <NeonButton variant="danger" size="sm" ghost @click="draft.workspaceGrantRoots.splice(index, 1)">delete</NeonButton>
-          </div>
-          <NeonButton size="sm" variant="secondary" ghost @click="addWorkspaceGrantRoot">+ add grant root</NeonButton>
-        </div>
-        <p class="field-hint">
-          every run must resolve into one of these roots. UMBRA now rejects dispatches outside this explicit allowlist, even if a workspace preset exists.
-        </p>
-      </GlassCard>
 
-      <GlassCard>
-        <h3 class="card-title">personas</h3>
-        <div v-for="(persona, index) in draft.personaPresets" :key="persona.id" class="persona-row">
-          <div class="persona-row__head">
-            <input v-model="persona.name" class="glass-input persona-name" placeholder="persona name" />
-            <NeonButton variant="danger" size="sm" ghost @click="draft.personaPresets.splice(index, 1)">delete</NeonButton>
-          </div>
-          <input v-model="persona.description" class="glass-input" placeholder="short description" />
-          <textarea
-            v-model="persona.prompt"
-            class="glass-input persona-prompt"
-            rows="4"
-            placeholder="system-style prompt fragment for this persona"
-          />
-        </div>
-        <NeonButton size="sm" variant="secondary" @click="addPersonaPreset">+ add persona</NeonButton>
-      </GlassCard>
+          <div class="setting-divider" />
 
-      <GlassCard>
-        <h3 class="card-title">workbench providers</h3>
-        <div class="provider-bootstrap-grid">
-          <label class="field">
-            <span class="field-label">bootstrap workspace</span>
-            <select v-model="providerBootstrapWorkspaceId" class="glass-input">
-              <option value="">select workspace</option>
-              <option v-for="workspace in workspaceOptions" :key="workspace.id" :value="workspace.id">
-                {{ workspace.name }}
-              </option>
-            </select>
-          </label>
-          <label class="field">
-            <span class="field-label">bootstrap agent</span>
-            <select v-model="providerBootstrapAgentId" class="glass-input">
-              <option value="">select agent</option>
-              <option v-for="agent in bootstrapAgents" :key="agent.id" :value="agent.id">
-                {{ agent.name }} · {{ agent.id }}
-              </option>
-            </select>
-          </label>
+          <div class="setting-row">
+            <div class="setting-copy">
+              <span class="setting-label">Start automatically at login</span>
+              <span class="setting-hint">Launches UMBRA in the background when you sign in to Windows. Works best with "Keep running when closed" turned on.</span>
+            </div>
+            <label class="toggle">
+              <input v-model="autostart" type="checkbox" @change="toggleAutostart" />
+              <span class="toggle-track" />
+            </label>
+          </div>
+        </GlassCard>
+      </section>
+
+      <!-- ══ Notes & Vault ══ -->
+      <section v-show="activeSection === 'notes'" class="settings-section">
+        <div class="section-header">
+          <h2 class="section-title">Notes & Vault</h2>
+          <p class="section-desc">Connect UMBRA to your Obsidian vault so notes load and sync correctly.</p>
         </div>
-        <label class="checkbox-row compact provider-overwrite-row">
-          <input v-model="providerBootstrapOverwrite" type="checkbox" />
-          <span>overwrite existing bootstrap files</span>
-        </label>
-        <div v-for="provider in draft.providerCommands" :key="provider.providerId" class="provider-row">
-          <div class="provider-copy">
-            <span class="provider-name">{{ providerLabel(provider.providerId) }}</span>
-            <span class="provider-hint">{{ provider.providerId }}</span>
-            <span class="provider-template">template: {{ providerTemplate(provider.providerId) }}</span>
-          </div>
-          <input
-            v-model="provider.command"
-            class="glass-input provider-command"
-            :placeholder="provider.providerId"
-          />
-          <div class="provider-actions">
-            <NeonButton size="sm" variant="secondary" ghost @click="checkProviderAuth(provider.providerId)">
-              auth
-            </NeonButton>
-            <NeonButton
-              size="sm"
-              variant="secondary"
-              ghost
-              :loading="Boolean(providerActionBusy[provider.providerId])"
-              @click="refreshProviderChecklist(provider.providerId)"
-            >
-              checklist
-            </NeonButton>
-            <NeonButton
-              size="sm"
-              variant="secondary"
-              ghost
-              :loading="Boolean(providerActionBusy[provider.providerId])"
-              @click="smokeTestProvider(provider.providerId)"
-            >
-              smoke
-            </NeonButton>
-            <NeonButton size="sm" variant="secondary" ghost @click="writeProviderBootstrap(provider.providerId)">
-              write bootstrap
-            </NeonButton>
-            <NeonButton size="sm" variant="secondary" ghost @click="copyProviderEnv(provider.providerId)">
-              copy env
-            </NeonButton>
-            <NeonButton
-              size="sm"
-              variant="secondary"
-              ghost
-              :loading="Boolean(probingProviders[provider.providerId])"
-              @click="probeProvider(provider.providerId)"
-            >
-              probe
-            </NeonButton>
-            <NeonButton size="sm" variant="secondary" ghost @click="openExternal(providerDocs(provider.providerId))">
-              docs
-            </NeonButton>
-          </div>
-          <span v-if="providerProbeResults[provider.providerId]" class="provider-result">
-            {{ providerProbeResults[provider.providerId]?.summary }}
-          </span>
-          <span v-if="providerActionResults[provider.providerId]" class="provider-result">
-            {{ providerActionResults[provider.providerId] }}
-          </span>
-          <div v-if="providerChecklists[provider.providerId]" class="provider-checklist">
-            <div
-              v-for="item in providerChecklists[provider.providerId]?.items ?? []"
-              :key="`${provider.providerId}-${item.key}`"
-              class="checklist-item"
-              :class="{ ready: item.ready, missing: !item.ready }"
-            >
-              <strong>{{ item.ready ? "ready" : "todo" }}</strong>
-              <span>{{ item.label }}</span>
-              <span class="provider-result">{{ item.detail }}</span>
+
+        <GlassCard>
+          <div class="field">
+            <label class="setting-label">Vault folder</label>
+            <span class="setting-hint">The root folder of your Obsidian vault. UMBRA reads and writes notes inside this folder.</span>
+            <div class="path-row">
+              <input v-model="draft.vaultPath" class="field-input glass-input" type="text" placeholder="e.g. C:/Users/you/Documents/MyVault" />
+              <NeonButton size="sm" variant="secondary" ghost type="button" @click="pickVaultPath">Browse</NeonButton>
             </div>
           </div>
-        </div>
-        <p class="field-hint">
-          set the exact executable UMBRA should launch for each provider. bootstrap actions use the selected workspace + agent, write instruction files into the repo, and can copy a ready worker env with the per-agent UAP token.
-        </p>
-        <div class="doc-links">
-          <NeonButton size="sm" variant="secondary" ghost @click="openExternal(agentSetupGuideUrl)">setup guide</NeonButton>
-        </div>
-      </GlassCard>
 
-      <GlassCard>
-        <h3 class="card-title">pm tool</h3>
-        <div class="field">
-          <label class="field-label">api url</label>
-          <input v-model="draft.pmToolUrl" class="field-input glass-input" type="text" placeholder="https://pm-tool.local/api" />
-        </div>
-        <div class="field">
-          <label class="field-label">dashboard url</label>
-          <input
-            v-model="draft.pmToolDashboardUrl"
-            class="field-input glass-input"
-            type="text"
-            placeholder="https://pm-tool.local"
-          />
-        </div>
-        <div class="field">
-          <label class="field-label">poll interval (seconds)</label>
-          <input v-model.number="draft.pmToolPollSeconds" class="field-input glass-input" type="number" min="5" max="300" />
-        </div>
-        <div class="doc-links">
-          <NeonButton size="sm" variant="secondary" ghost :disabled="!pmDocsUrl" @click="openExternal(pmDocsUrl)">open api docs</NeonButton>
-          <NeonButton size="sm" variant="secondary" ghost :disabled="!pmDashboardUrl" @click="openExternal(pmDashboardUrl)">open tool dashboard</NeonButton>
-        </div>
-        <p class="field-hint">leave blank if you do not want a live PM integration. docs use the api url, dashboard prefers the explicit dashboard url.</p>
-      </GlassCard>
+          <div class="field">
+            <label class="setting-label">Notes subfolder</label>
+            <span class="setting-hint">The folder inside your vault where UMBRA stores its notes. Keep the default unless you want to move them.</span>
+            <input v-model="draft.notesSubdir" class="field-input glass-input" type="text" placeholder="UMBRA_Notes" />
+          </div>
+        </GlassCard>
+      </section>
 
-      <GlassCard>
-        <h3 class="card-title">release & updates</h3>
-        <div class="field">
-          <label class="field-label">updater endpoint</label>
-          <textarea
-            v-model="draft.updaterEndpoint"
-            class="field-input glass-input updater-textarea"
-            rows="3"
-            placeholder="https://releases.example.com/latest.json"
-          />
+      <!-- ══ Project Management ══ -->
+      <section v-show="activeSection === 'pm'" class="settings-section">
+        <div class="section-header">
+          <h2 class="section-title">Project Management</h2>
+          <p class="section-desc">Connect UMBRA to your PM tool to keep tasks and priorities in sync.</p>
         </div>
-        <div class="field">
-          <label class="field-label">updater public key</label>
-          <textarea
-            v-model="draft.updaterPublicKey"
-            class="field-input glass-input updater-textarea"
-            rows="4"
-            placeholder="CONTENT FROM PUBLICKEY.PEM"
-          />
-        </div>
-        <label class="checkbox-row">
-          <input v-model="draft.autoCheckForUpdates" type="checkbox" />
-          <span>check for updates on app start</span>
-        </label>
-        <div class="doc-links">
-          <NeonButton size="sm" variant="secondary" ghost :loading="checkingUpdates" @click="checkForUpdates">check now</NeonButton>
-          <NeonButton
-            size="sm"
-            variant="secondary"
-            ghost
-            :disabled="!canInstallUpdate"
-            :loading="installingUpdate"
-            @click="installUpdate"
-          >
-            install pending update
-          </NeonButton>
-        </div>
-        <p class="field-hint">
-          {{ updateMessage }}
-        </p>
-        <p class="field-hint">
-          runtime update checks work from these settings. signed updater bundles still require signing env vars during the release build.
-        </p>
-      </GlassCard>
 
-      <GlassCard>
-        <h3 class="card-title">taskboard</h3>
-        <div class="field">
-          <label class="field-label">lane defaults</label>
+        <GlassCard>
+          <div class="field">
+            <label class="setting-label">API URL</label>
+            <span class="setting-hint">The base URL of your PM tool's API endpoint. Leave blank to disable the PM integration.</span>
+            <input v-model="draft.pmToolUrl" class="field-input glass-input" type="text" placeholder="http://100.115.61.30:8000/api" />
+          </div>
+
+          <div class="field">
+            <label class="setting-label">Dashboard URL</label>
+            <span class="setting-hint">Where to open the PM tool's web dashboard. Leave blank and UMBRA will derive it from the API URL.</span>
+            <input v-model="draft.pmToolDashboardUrl" class="field-input glass-input" type="text" placeholder="http://100.115.61.30:4173" />
+          </div>
+
+          <div class="field">
+            <label class="setting-label">Sync interval</label>
+            <span class="setting-hint">How often UMBRA polls the PM tool for changes. Minimum 5 seconds, maximum 300.</span>
+            <div class="number-row">
+              <input v-model.number="draft.pmToolPollSeconds" class="field-input glass-input number-input" type="number" min="5" max="300" />
+              <span class="unit-label">seconds</span>
+            </div>
+          </div>
+
+          <div class="doc-links">
+            <NeonButton size="sm" variant="secondary" ghost type="button" :disabled="!pmDocsUrl" @click="openExternal(pmDocsUrl)">Open API docs ↗</NeonButton>
+            <NeonButton size="sm" variant="secondary" ghost type="button" :disabled="!pmDashboardUrl" @click="openExternal(pmDashboardUrl)">Open dashboard ↗</NeonButton>
+          </div>
+        </GlassCard>
+      </section>
+
+      <!-- ══ Agents & Workspaces ══ -->
+      <section v-show="activeSection === 'agents'" class="settings-section">
+        <div class="section-header">
+          <h2 class="section-title">Agents & Workspaces</h2>
+          <p class="section-desc">Set up where agents work, which AI providers power them, and how they authenticate.</p>
+        </div>
+
+        <!-- Workspaces -->
+        <GlassCard>
+          <div class="group-title">Workspaces</div>
+          <p class="group-desc">A workspace is a folder on your machine where an agent can read and write files. You need at least one workspace before dispatching work.</p>
+
+          <div v-for="(workspace, index) in draft.workspacePresets" :key="workspace.id" class="workspace-card">
+            <div class="workspace-row__head">
+              <input v-model="workspace.name" class="glass-input workspace-name" placeholder="Workspace name (e.g. UMBRA)" />
+              <label class="inline-check">
+                <input v-model="workspace.writable" type="checkbox" />
+                <span>Writable</span>
+              </label>
+              <label class="inline-check">
+                <input
+                  :checked="draft.defaultWorkspaceId === workspace.id"
+                  type="radio"
+                  name="default-workspace"
+                  @change="draft.defaultWorkspaceId = workspace.id"
+                />
+                <span>Default</span>
+              </label>
+              <NeonButton variant="danger" size="sm" ghost type="button" @click="draft.workspacePresets.splice(index, 1)">Remove</NeonButton>
+            </div>
+            <div class="grant-row">
+              <input v-model="workspace.rootPath" class="glass-input" placeholder="Absolute folder path (e.g. C:/Projects/UMBRA)" />
+              <NeonButton size="sm" variant="secondary" ghost type="button" @click="pickWorkspaceRoot(index)">Browse</NeonButton>
+            </div>
+            <div class="workspace-grid">
+              <label class="field">
+                <span class="field-label">Allowed providers</span>
+                <span class="setting-hint">Which AI providers can use this workspace. Comma-separated (e.g. codex, claude).</span>
+                <input
+                  :value="workspaceProvidersValue(workspace)"
+                  class="glass-input"
+                  placeholder="codex, claude"
+                  @input="setWorkspaceProviders(workspace, ($event.target as HTMLInputElement).value)"
+                />
+              </label>
+              <label class="field">
+                <span class="field-label">Allowed agents</span>
+                <span class="setting-hint">Which agent IDs can use this workspace. Leave blank to allow all agents.</span>
+                <input
+                  :value="workspaceAgentsValue(workspace)"
+                  class="glass-input"
+                  placeholder="forge, prism (or leave blank for all)"
+                  @input="setWorkspaceAgents(workspace, ($event.target as HTMLInputElement).value)"
+                />
+              </label>
+            </div>
+          </div>
+
+          <div class="workspace-actions">
+            <NeonButton size="sm" variant="secondary" type="button" @click="addWorkspacePreset">+ Add workspace</NeonButton>
+            <NeonButton size="sm" variant="secondary" ghost type="button" @click="seedWorkspaceGrantRoots">Auto-fill allowed paths</NeonButton>
+          </div>
+
+          <div class="field" style="margin-top: 20px">
+            <label class="setting-label">Allowed root paths</label>
+            <span class="setting-hint">Safety allowlist — agents can only access folders inside these paths. Any dispatch outside this list is blocked, even if a workspace exists. Use "Auto-fill" to populate from your workspaces above.</span>
+            <div v-for="(root, index) in draft.workspaceGrantRoots" :key="`${root}-${index}`" class="grant-row" style="margin-top: 8px">
+              <input v-model="draft.workspaceGrantRoots[index]" class="glass-input" placeholder="e.g. C:/Projects" />
+              <NeonButton size="sm" variant="secondary" ghost type="button" @click="pickGrantRoot(index)">Browse</NeonButton>
+              <NeonButton variant="danger" size="sm" ghost type="button" @click="draft.workspaceGrantRoots.splice(index, 1)">Remove</NeonButton>
+            </div>
+            <NeonButton size="sm" variant="secondary" ghost type="button" style="margin-top: 8px" @click="addWorkspaceGrantRoot">+ Add path</NeonButton>
+          </div>
+        </GlassCard>
+
+        <!-- AI Providers -->
+        <GlassCard>
+          <div class="group-title">AI providers</div>
+          <p class="group-desc">UMBRA launches a CLI tool for each provider. Set the exact command (or full path to the executable). Use "Check setup" to verify the provider is ready.</p>
+
+          <div class="provider-bootstrap-grid">
+            <label class="field">
+              <span class="field-label">Target workspace</span>
+              <select v-model="providerBootstrapWorkspaceId" class="glass-input">
+                <option value="">Select workspace</option>
+                <option v-for="ws in workspaceOptions" :key="ws.id" :value="ws.id">{{ ws.name }}</option>
+              </select>
+            </label>
+            <label class="field">
+              <span class="field-label">Target agent</span>
+              <select v-model="providerBootstrapAgentId" class="glass-input">
+                <option value="">Select agent</option>
+                <option v-for="agent in bootstrapAgents" :key="agent.id" :value="agent.id">{{ agent.name }} · {{ agent.id }}</option>
+              </select>
+            </label>
+          </div>
+
+          <label class="checkbox-row compact" style="margin-bottom: 16px">
+            <input v-model="providerBootstrapOverwrite" type="checkbox" />
+            <span>Overwrite existing instruction files when writing bootstrap</span>
+          </label>
+
+          <div v-for="provider in draft.providerCommands" :key="provider.providerId" class="provider-block">
+            <div class="provider-block__header">
+              <div class="provider-copy">
+                <span class="provider-name">{{ providerLabel(provider.providerId) }}</span>
+                <span class="provider-hint">id: {{ provider.providerId }}</span>
+                <span class="provider-template">template: {{ providerTemplate(provider.providerId) }}</span>
+              </div>
+              <input v-model="provider.command" class="glass-input provider-command" :placeholder="provider.providerId" />
+            </div>
+
+            <div class="provider-actions">
+              <NeonButton size="sm" variant="secondary" ghost type="button" @click="checkProviderAuth(provider.providerId)">Check auth</NeonButton>
+              <NeonButton size="sm" variant="secondary" ghost type="button" :loading="Boolean(providerActionBusy[provider.providerId])" @click="refreshProviderChecklist(provider.providerId)">Check setup</NeonButton>
+              <NeonButton size="sm" variant="secondary" ghost type="button" :loading="Boolean(providerActionBusy[provider.providerId])" @click="smokeTestProvider(provider.providerId)">Smoke test</NeonButton>
+              <NeonButton size="sm" variant="secondary" ghost type="button" @click="writeProviderBootstrap(provider.providerId)">Write instructions</NeonButton>
+              <NeonButton size="sm" variant="secondary" ghost type="button" @click="copyProviderEnv(provider.providerId)">Copy env</NeonButton>
+              <NeonButton size="sm" variant="secondary" ghost type="button" :loading="Boolean(probingProviders[provider.providerId])" @click="probeProvider(provider.providerId)">Probe CLI</NeonButton>
+              <NeonButton size="sm" variant="secondary" ghost type="button" @click="openExternal(providerDocs(provider.providerId))">Docs ↗</NeonButton>
+            </div>
+
+            <span v-if="providerProbeResults[provider.providerId]" class="provider-result">
+              {{ providerProbeResults[provider.providerId]?.summary }}
+            </span>
+            <span v-if="providerActionResults[provider.providerId]" class="provider-result">
+              {{ providerActionResults[provider.providerId] }}
+            </span>
+
+            <div v-if="providerChecklists[provider.providerId]" class="provider-checklist">
+              <div
+                v-for="item in providerChecklists[provider.providerId]?.items ?? []"
+                :key="`${provider.providerId}-${item.key}`"
+                class="checklist-item"
+                :class="{ ready: item.ready, missing: !item.ready }"
+              >
+                <span class="checklist-status">{{ item.ready ? "✓" : "○" }}</span>
+                <strong>{{ item.label }}</strong>
+                <span class="provider-result">{{ item.detail }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="doc-links" style="margin-top: 12px">
+            <NeonButton size="sm" variant="secondary" ghost type="button" @click="openExternal(agentSetupGuideUrl)">Agent setup guide ↗</NeonButton>
+          </div>
+        </GlassCard>
+
+        <!-- Agent tokens -->
+        <GlassCard>
+          <div class="group-title">Agent auth tokens</div>
+          <p class="group-desc">Each agent authenticates with its own secret token. Tokens are created automatically. Use "Rotate" only if a token is compromised — the agent must update its config afterwards.</p>
+
+          <div class="token-table">
+            <div class="token-row token-row--head">
+              <span>Agent</span>
+              <span>Token</span>
+              <span>Actions</span>
+            </div>
+            <div v-for="(token, agentId) in agentTokenEntries" :key="agentId" class="token-row">
+              <span class="token-agent">{{ agentId }}</span>
+              <div class="token-value-cell">
+                <input
+                  :value="tokenVisible[String(agentId)] ? token : '••••••••••••••••'"
+                  class="glass-input token-input"
+                  type="text"
+                  readonly
+                />
+                <button type="button" class="token-action" @click="toggleTokenVisibility(String(agentId))">
+                  {{ tokenVisible[String(agentId)] ? "Hide" : "Show" }}
+                </button>
+                <button type="button" class="token-action" @click="copyToken(String(token))">Copy</button>
+              </div>
+              <div class="token-actions-cell">
+                <button type="button" class="token-action token-action--danger" @click="regenerateToken(String(agentId))">Rotate</button>
+              </div>
+            </div>
+          </div>
+          <p v-if="tokenCopied" class="field-hint success-text">Token copied to clipboard.</p>
+        </GlassCard>
+
+        <!-- Personas -->
+        <GlassCard>
+          <div class="group-title">Personas</div>
+          <p class="group-desc">Personas are prompt presets that change how an agent approaches a task. Select one in the Workbench composer before dispatching work.</p>
+
+          <div v-for="(persona, index) in draft.personaPresets" :key="persona.id" class="persona-row">
+            <div class="persona-row__head">
+              <input v-model="persona.name" class="glass-input persona-name" placeholder="Persona name (e.g. Reviewer)" />
+              <NeonButton variant="danger" size="sm" ghost type="button" @click="draft.personaPresets.splice(index, 1)">Remove</NeonButton>
+            </div>
+            <input v-model="persona.description" class="glass-input" placeholder="Short description shown in the dropdown" />
+            <textarea
+              v-model="persona.prompt"
+              class="glass-input persona-prompt"
+              rows="4"
+              placeholder="System prompt fragment — prepended to the agent's instructions for this run"
+            />
+          </div>
+          <NeonButton size="sm" variant="secondary" type="button" @click="addPersonaPreset">+ Add persona</NeonButton>
+        </GlassCard>
+      </section>
+
+      <!-- ══ GitHub ══ -->
+      <section v-show="activeSection === 'github'" class="settings-section">
+        <div class="section-header">
+          <h2 class="section-title">GitHub</h2>
+          <p class="section-desc">Connect UMBRA to GitHub to open pull requests and browse repos from the Launcher.</p>
+        </div>
+
+        <GlassCard>
+          <div class="field">
+            <label class="setting-label">Local repos folder</label>
+            <span class="setting-hint">The folder on this machine where your Git repositories live. Used by local Git actions and the Launcher.</span>
+            <div class="path-row">
+              <input v-model="draft.repoRootPath" class="field-input glass-input" type="text" placeholder="e.g. C:/Repos" />
+              <NeonButton size="sm" variant="secondary" ghost type="button" @click="pickRepoRootPath">Browse</NeonButton>
+            </div>
+          </div>
+
+          <div class="field">
+            <label class="setting-label">Personal access token</label>
+            <span class="setting-hint">A GitHub token with <code>public_repo</code> scope (or <code>repo</code> for private repos). Required to open PRs and list all repositories in the Launcher.</span>
+            <input v-model="draft.githubPat" class="field-input glass-input" type="password" placeholder="ghp_..." autocomplete="off" />
+          </div>
+        </GlassCard>
+      </section>
+
+      <!-- ══ Launcher ══ -->
+      <section v-show="activeSection === 'launcher'" class="settings-section">
+        <div class="section-header">
+          <h2 class="section-title">Quick launch</h2>
+          <p class="section-desc">Apps and tools that appear in the Launcher for one-click access.</p>
+        </div>
+
+        <GlassCard>
+          <p v-if="!draft.launchTargets?.length" class="field-hint" style="margin-bottom: 12px">No apps added yet. Click "+ Add app" to create your first shortcut.</p>
+
+          <div v-for="(target, i) in draft.launchTargets" :key="i" class="launch-row">
+            <input v-model="target.name" class="glass-input launch-name" placeholder="Name (e.g. VS Code)" />
+            <input v-model="target.path" class="glass-input launch-path" placeholder="Executable path (e.g. C:/Program Files/VS Code/Code.exe)" />
+            <NeonButton variant="danger" size="sm" ghost type="button" @click="draft.launchTargets!.splice(i, 1)">Remove</NeonButton>
+          </div>
+
+          <NeonButton size="sm" variant="secondary" type="button" @click="addLaunchTarget">+ Add app</NeonButton>
+        </GlassCard>
+      </section>
+
+      <!-- ══ Taskboard ══ -->
+      <section v-show="activeSection === 'taskboard'" class="settings-section">
+        <div class="section-header">
+          <h2 class="section-title">Taskboard</h2>
+          <p class="section-desc">Choose how each column behaves when you open the Tasks view.</p>
+        </div>
+
+        <GlassCard>
           <div class="lane-pref-list">
             <div v-for="lane in laneOptions" :key="lane.kind" class="lane-pref-row">
               <div class="lane-copy">
@@ -354,86 +425,90 @@
               </div>
             </div>
           </div>
-        </div>
-        <p class="field-hint">`smart` keeps UMBRA defaults. `expanded` and `collapsed` override the board startup state explicitly.</p>
-      </GlassCard>
+          <p class="field-hint" style="margin-top: 14px">
+            <strong>Smart</strong> — UMBRA collapses or expands based on task count.
+            <strong>Expanded</strong> / <strong>Collapsed</strong> — always open or always closed.
+          </p>
+        </GlassCard>
+      </section>
 
-      <GlassCard>
-        <h3 class="card-title">uap</h3>
-        <div class="field">
-          <label class="field-label">advertise host</label>
-          <input v-model="draft.uapAdvertiseHost" class="field-input glass-input" type="text" placeholder="127.0.0.1" />
+      <!-- ══ Advanced ══ -->
+      <section v-show="activeSection === 'advanced'" class="settings-section">
+        <div class="section-header">
+          <h2 class="section-title">Advanced</h2>
+          <p class="section-desc">Core infrastructure settings. Only change these if you know what you're doing — incorrect values can break agent connectivity.</p>
         </div>
-        <div class="field-row">
-          <div class="field">
-            <label class="field-label">port</label>
-            <input v-model.number="draft.uapPort" class="field-input glass-input" type="number" min="1" max="65535" />
-          </div>
-          <div class="field">
-            <label class="field-label">legacy shared token</label>
-            <input v-model="draft.uapToken" class="field-input glass-input" type="text" autocomplete="off" />
-          </div>
-        </div>
-        <p class="field-hint">runtime auth now uses per-agent tokens. this legacy field is retained for compatibility only.</p>
-      </GlassCard>
 
-      <GlassCard>
-        <h3 class="card-title">agent auth tokens</h3>
-        <p class="field-hint" style="margin-bottom: 12px">
-          each agent authenticates via its own <code>X-Agent-Token</code> header.
-          tokens are auto-generated on first run. use <strong>regenerate</strong> to rotate a token — the agent must update its config accordingly.
-        </p>
-        <div class="token-table">
-          <div class="token-row token-row--head">
-            <span>agent</span>
-            <span>token</span>
-            <span>actions</span>
+        <GlassCard>
+          <div class="group-title">Agent communication (UAP)</div>
+          <p class="group-desc">UMBRA exposes a local HTTP server that agents connect to. These settings control where that server listens.</p>
+
+          <div class="field">
+            <label class="setting-label">Listen address</label>
+            <span class="setting-hint">The IP address agents connect to. Use 127.0.0.1 for local-only access. Use a LAN IP if agents run on other machines on your network.</span>
+            <input v-model="draft.uapAdvertiseHost" class="field-input glass-input" type="text" placeholder="127.0.0.1" />
           </div>
-          <div v-for="(token, agentId) in agentTokenEntries" :key="agentId" class="token-row">
-            <span class="token-agent">{{ agentId }}</span>
-            <div class="token-value-cell">
-              <input
-                :value="tokenVisible[String(agentId)] ? token : '••••••••••••••••'"
-                class="glass-input token-input"
-                type="text"
-                readonly
-              />
-              <button type="button" class="token-action" title="toggle visibility" @click="toggleTokenVisibility(String(agentId))">
-                {{ tokenVisible[String(agentId)] ? "hide" : "show" }}
-              </button>
-              <button type="button" class="token-action" title="copy to clipboard" @click="copyToken(String(token))">copy</button>
+
+          <div class="field-row">
+            <div class="field">
+              <label class="setting-label">Port</label>
+              <span class="setting-hint">Default: 8765</span>
+              <input v-model.number="draft.uapPort" class="field-input glass-input" type="number" min="1" max="65535" />
             </div>
-            <div class="token-actions-cell">
-              <button type="button" class="token-action token-action--danger" @click="regenerateToken(String(agentId))">regenerate</button>
+            <div class="field">
+              <label class="setting-label">Legacy shared token</label>
+              <span class="setting-hint">Kept for backwards compatibility only. All new connections use per-agent tokens instead.</span>
+              <input v-model="draft.uapToken" class="field-input glass-input" type="text" autocomplete="off" />
             </div>
           </div>
-        </div>
-        <p v-if="tokenCopied" class="field-hint" style="color: var(--accent-success)">token copied to clipboard.</p>
-      </GlassCard>
+        </GlassCard>
 
-      <GlassCard>
-        <h3 class="card-title">github</h3>
-        <div class="field">
-          <label class="field-label">local repo root</label>
-          <input
-            v-model="draft.repoRootPath"
-            class="field-input glass-input"
-            type="text"
-            placeholder="C:/Repos"
-          />
-        </div>
-        <div class="field">
-          <label class="field-label">personal access token</label>
-          <input v-model="draft.githubPat" class="field-input glass-input" type="password" placeholder="ghp_..." autocomplete="off" />
-        </div>
-        <p class="field-hint">token needs <code>public_repo</code> scope, or <code>repo</code> for private repos. launcher all-repos needs a token; local repo actions use the root path above.</p>
-      </GlassCard>
+        <GlassCard>
+          <div class="group-title">App updates</div>
+          <p class="group-desc">Set up a release feed to receive update notifications. Leave blank to disable.</p>
 
-      <div class="form-actions">
-        <NeonButton type="submit" variant="primary" :loading="saving">save settings</NeonButton>
-        <span v-if="saved" class="saved-label">saved.</span>
-      </div>
-    </form>
+          <div class="field">
+            <label class="setting-label">Update feed URL</label>
+            <span class="setting-hint">A URL pointing to a JSON file that describes the latest release. Leave blank to disable automatic update checks.</span>
+            <textarea
+              v-model="draft.updaterEndpoint"
+              class="field-input glass-input updater-textarea"
+              rows="2"
+              placeholder="https://releases.example.com/latest.json"
+            />
+          </div>
+
+          <div class="field">
+            <label class="setting-label">Release signing key</label>
+            <span class="setting-hint">The public key used to verify update packages are authentic. Paste the full contents of publickey.pem.</span>
+            <textarea
+              v-model="draft.updaterPublicKey"
+              class="field-input glass-input updater-textarea"
+              rows="3"
+              placeholder="CONTENT FROM PUBLICKEY.PEM"
+            />
+          </div>
+
+          <div class="setting-row" style="margin-top: 12px">
+            <div class="setting-copy">
+              <span class="setting-label">Check for updates on start</span>
+              <span class="setting-hint">Automatically checks the release feed each time UMBRA launches.</span>
+            </div>
+            <label class="toggle">
+              <input v-model="draft.autoCheckForUpdates" type="checkbox" />
+              <span class="toggle-track" />
+            </label>
+          </div>
+
+          <div class="doc-links" style="margin-top: 14px">
+            <NeonButton size="sm" variant="secondary" ghost type="button" :loading="checkingUpdates" @click="checkForUpdates">Check now</NeonButton>
+            <NeonButton size="sm" variant="secondary" ghost type="button" :disabled="!canInstallUpdate" :loading="installingUpdate" @click="installUpdate">Install update</NeonButton>
+          </div>
+          <p class="field-hint" style="margin-top: 8px">{{ updateMessage }}</p>
+        </GlassCard>
+      </section>
+
+    </main>
   </div>
 </template>
 
@@ -442,7 +517,6 @@ import { computed, onMounted, reactive, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { open as shellOpen } from "@tauri-apps/plugin-shell";
-import ViewHero from "@/components/layout/ViewHero.vue";
 import type {
   AppConfig,
   ProviderAuthState,
@@ -457,6 +531,21 @@ import { useConfigStore } from "@/stores/useConfigStore";
 import GlassCard from "@/components/ui/GlassCard.vue";
 import NeonButton from "@/components/ui/NeonButton.vue";
 
+// ── Navigation ──────────────────────────────────────────────────
+const activeSection = ref("appearance");
+
+const sections = [
+  { id: "appearance", label: "Appearance",         icon: "◑" },
+  { id: "notes",      label: "Notes & Vault",      icon: "◧" },
+  { id: "pm",         label: "Project Management", icon: "◈" },
+  { id: "agents",     label: "Agents",             icon: "◎" },
+  { id: "github",     label: "GitHub",             icon: "◻" },
+  { id: "launcher",   label: "Quick Launch",       icon: "◁" },
+  { id: "taskboard",  label: "Taskboard",          icon: "◫" },
+  { id: "advanced",   label: "Advanced",           icon: "◌" },
+] as const;
+
+// ── Stores & state ──────────────────────────────────────────────
 const agentStore = useAgentStore();
 const configStore = useConfigStore();
 const saving = ref(false);
@@ -474,6 +563,7 @@ const providerChecklists = ref<Record<string, ProviderSetupChecklistResult | nul
 const tokenVisible = ref<Record<string, boolean>>({});
 const tokenCopied = ref(false);
 
+// ── Tokens ──────────────────────────────────────────────────────
 const agentTokenEntries = computed(() => {
   const tokens = draft.agentAuthTokens ?? {};
   const sorted = Object.entries(tokens).sort(([a], [b]) => a.localeCompare(b));
@@ -496,34 +586,37 @@ function regenerateToken(agentId: string) {
   if (!draft.agentAuthTokens) draft.agentAuthTokens = {};
   draft.agentAuthTokens[agentId] = crypto.randomUUID();
 }
+
+// ── Provider bootstrap ───────────────────────────────────────────
 const providerBootstrapWorkspaceId = ref("");
 const providerBootstrapAgentId = ref("");
 const providerBootstrapOverwrite = ref(false);
 
+// ── Static data ──────────────────────────────────────────────────
 const themes = [
-  { value: "ember", label: "ember", color: "#d4520a" },
-  { value: "neon", label: "neon", color: "#00f5ff" },
-  { value: "light", label: "light", color: "#3b82f6" },
+  { value: "ember", label: "Ember",  color: "#d4520a" },
+  { value: "neon",  label: "Neon",   color: "#00f5ff" },
+  { value: "light", label: "Light",  color: "#00658d" },
 ];
 
 const laneOptions = [
-  { kind: "backlog", label: "backlog", hint: "smart = collapse only on dense boards" },
-  { kind: "in_progress", label: "in progress", hint: "usually best left open" },
-  { kind: "review", label: "review", hint: "smart = starts collapsed when populated" },
-  { kind: "done", label: "done", hint: "smart = starts collapsed when populated" },
+  { kind: "backlog",     label: "Backlog",      hint: "Smart = collapse only on dense boards" },
+  { kind: "in_progress", label: "In progress",  hint: "Usually best left open" },
+  { kind: "review",      label: "Review",       hint: "Smart = starts collapsed when populated" },
+  { kind: "done",        label: "Done",         hint: "Smart = starts collapsed when populated" },
 ] as const;
 
 const laneModes = [
-  { value: "smart", label: "smart" },
-  { value: "expanded", label: "expanded" },
-  { value: "collapsed", label: "collapsed" },
+  { value: "smart",     label: "Smart" },
+  { value: "expanded",  label: "Expanded" },
+  { value: "collapsed", label: "Collapsed" },
 ] as const;
 
 const defaultProviderCommands = [
-  { providerId: "codex", command: "codex" },
+  { providerId: "codex",  command: "codex" },
   { providerId: "claude", command: "claude" },
   { providerId: "gemini", command: "gemini" },
-  { providerId: "kimi", command: "kimi" },
+  { providerId: "kimi",   command: "kimi" },
 ];
 
 const defaultPersonaPresets = [
@@ -547,6 +640,7 @@ const defaultPersonaPresets = [
   },
 ];
 
+// ── Computed URLs ────────────────────────────────────────────────
 const pmApiUrl = computed(() => draft.pmToolUrl.trim().replace(/\/+$/, ""));
 const pmDocsUrl = computed(() => {
   if (!pmApiUrl.value) return "";
@@ -558,9 +652,7 @@ const pmDashboardUrl = computed(() => {
   if (!pmApiUrl.value) return "";
   try {
     const url = new URL(pmApiUrl.value);
-    if (url.port === "8000") {
-      url.port = "4173";
-    }
+    if (url.port === "8000") url.port = "4173";
     url.pathname = "";
     url.search = "";
     url.hash = "";
@@ -573,18 +665,19 @@ const canInstallUpdate = computed(() => Boolean(lastUpdateCheck.value?.updateAva
 const updateMessage = computed(() => {
   if (updateError.value) return updateError.value;
   if (!draft.updaterEndpoint.trim() || !draft.updaterPublicKey.trim()) {
-    return "set endpoint + public key to enable runtime update checks.";
+    return "Set the update feed URL and signing key to enable runtime update checks.";
   }
-  if (checkingUpdates.value) return "checking release feed...";
-  if (installingUpdate.value) return "installing update. windows will close the app if an update is ready.";
-  if (!lastUpdateCheck.value) return "no check yet.";
-  if (!lastUpdateCheck.value.configured) return "updater config incomplete.";
+  if (checkingUpdates.value) return "Checking release feed…";
+  if (installingUpdate.value) return "Installing update — UMBRA will restart if an update is ready.";
+  if (!lastUpdateCheck.value) return "No check run yet.";
+  if (!lastUpdateCheck.value.configured) return "Updater configuration incomplete.";
   if (lastUpdateCheck.value.updateAvailable) {
-    return `update ${lastUpdateCheck.value.version} is ready for install.`;
+    return `Update ${lastUpdateCheck.value.version} is ready to install.`;
   }
-  return `no update available. current version: ${lastUpdateCheck.value.currentVersion}.`;
+  return `Up to date. Current version: ${lastUpdateCheck.value.currentVersion}.`;
 });
 
+// ── Provider helpers ─────────────────────────────────────────────
 function applyTheme(t: string) {
   draft.theme = t;
   configStore.setTheme(t);
@@ -596,18 +689,15 @@ function mergeProviderCommands(commands: AppConfig["providerCommands"] | undefin
       .filter((entry) => entry.providerId?.trim() && entry.command?.trim())
       .map((entry) => [entry.providerId.trim().toLowerCase(), entry.command.trim()]),
   );
-
   const merged = defaultProviderCommands.map((entry) => ({
     providerId: entry.providerId,
     command: byProvider.get(entry.providerId) ?? entry.command,
   }));
-
   for (const [providerId, command] of byProvider.entries()) {
     if (!merged.some((entry) => entry.providerId === providerId)) {
       merged.push({ providerId, command });
     }
   }
-
   return merged;
 }
 
@@ -620,64 +710,49 @@ function mergePersonaPresets(personas: AppConfig["personaPresets"] | undefined) 
       description: persona.description?.trim() ?? "",
       prompt: persona.prompt.trim(),
     }));
-
-  return normalized.length > 0
-    ? normalized
-    : defaultPersonaPresets.map((persona) => ({ ...persona }));
+  return normalized.length > 0 ? normalized : defaultPersonaPresets.map((p) => ({ ...p }));
 }
 
 function providerLabel(providerId: string) {
   switch (providerId) {
-    case "codex":
-      return "OpenAI Codex";
-    case "claude":
-      return "Claude Code";
-    case "gemini":
-      return "Gemini CLI";
-    case "kimi":
-      return "Kimi";
-    default:
-      return providerId;
+    case "codex":  return "OpenAI Codex";
+    case "claude": return "Claude Code";
+    case "gemini": return "Gemini CLI";
+    case "kimi":   return "Kimi";
+    default:       return providerId;
   }
 }
 
 function providerDocs(providerId: string) {
   switch (providerId) {
-    case "codex":
-      return "https://openai.com/index/unlocking-the-codex-harness/";
-    case "claude":
-      return "https://docs.anthropic.com/en/docs/claude-code/cli-reference";
-    case "gemini":
-      return "https://github.com/google-gemini/gemini-cli";
-    case "kimi":
-      return "https://platform.moonshot.ai/docs/guide/agent-support";
-    default:
-      return "https://github.com";
+    case "codex":  return "https://openai.com/index/unlocking-the-codex-harness/";
+    case "claude": return "https://docs.anthropic.com/en/docs/claude-code/cli-reference";
+    case "gemini": return "https://github.com/google-gemini/gemini-cli";
+    case "kimi":   return "https://platform.moonshot.ai/docs/guide/agent-support";
+    default:       return "https://github.com";
   }
 }
 
 function providerTemplate(providerId: string) {
   switch (providerId) {
-    case "codex":
-      return "templates/AGENTS.codex.md";
-    case "claude":
-      return "templates/CLAUDE.md";
-    case "gemini":
-      return "templates/GEMINI.md";
-    default:
-      return "templates/worker.env.example";
+    case "codex":  return "templates/AGENTS.codex.md";
+    case "claude": return "templates/CLAUDE.md";
+    case "gemini": return "templates/GEMINI.md";
+    default:       return "templates/worker.env.example";
   }
 }
 
 const agentSetupGuideUrl =
   "https://github.com/AstroGolem224/UMBRA/blob/main/docs/agent-setup-guide-2026-03-25.md";
+
 const workspaceOptions = computed(() =>
-  (draft.workspacePresets ?? []).filter((workspace) => workspace.name.trim() && workspace.rootPath.trim()),
+  (draft.workspacePresets ?? []).filter((ws) => ws.name.trim() && ws.rootPath.trim()),
 );
 const bootstrapAgents = computed(() =>
   agentStore.agents.filter((agent) => ["online", "idle", "working"].includes(agent.status)),
 );
 
+// ── Draft state ──────────────────────────────────────────────────
 const draft = reactive<AppConfig>({
   ...configStore.config,
   workspaceGrantRoots: [...(configStore.config.workspaceGrantRoots ?? [])],
@@ -694,9 +769,20 @@ watch(
       personaPresets: mergePersonaPresets(c.personaPresets),
       providerCommands: mergeProviderCommands(c.providerCommands),
     }),
-  { deep: true }
+  { deep: true },
 );
 
+// ── Lifecycle ────────────────────────────────────────────────────
+onMounted(async () => {
+  if (!agentStore.agents.length) await agentStore.loadAgents();
+  ensureBootstrapSelections();
+  await refreshAllProviderChecklists();
+  try {
+    autostart.value = await invoke<boolean>("plugin:autostart|is_enabled");
+  } catch { /* not available in browser mode */ }
+});
+
+// ── Actions ──────────────────────────────────────────────────────
 async function toggleAutostart() {
   try {
     if (autostart.value) {
@@ -704,23 +790,8 @@ async function toggleAutostart() {
     } else {
       await invoke("plugin:autostart|disable");
     }
-  } catch {
-    // Autostart plugin not available in browser mode
-  }
+  } catch { /* not available in browser mode */ }
 }
-
-onMounted(async () => {
-  if (!agentStore.agents.length) {
-    await agentStore.loadAgents();
-  }
-  ensureBootstrapSelections();
-  await refreshAllProviderChecklists();
-  try {
-    autostart.value = await invoke<boolean>("plugin:autostart|is_enabled");
-  } catch {
-    // Not available in browser mode
-  }
-});
 
 function addLaunchTarget() {
   if (!draft.launchTargets) draft.launchTargets = [];
@@ -739,12 +810,7 @@ function addWorkspacePreset() {
 }
 
 function addPersonaPreset() {
-  draft.personaPresets.push({
-    id: crypto.randomUUID(),
-    name: "",
-    description: "",
-    prompt: "",
-  });
+  draft.personaPresets.push({ id: crypto.randomUUID(), name: "", description: "", prompt: "" });
 }
 
 function addWorkspaceGrantRoot() {
@@ -752,10 +818,7 @@ function addWorkspaceGrantRoot() {
 }
 
 function seedWorkspaceGrantRoots() {
-  draft.workspaceGrantRoots = mergeWorkspaceGrantRoots(
-    draft.workspaceGrantRoots,
-    draft.workspacePresets,
-  );
+  draft.workspaceGrantRoots = mergeWorkspaceGrantRoots(draft.workspaceGrantRoots, draft.workspacePresets);
 }
 
 function workspaceProvidersValue(workspace: WorkspacePreset) {
@@ -775,44 +838,33 @@ function setWorkspaceAgents(workspace: WorkspacePreset, value: string) {
 }
 
 function parseCsvList(value: string) {
-  return value
-    .split(",")
-    .map((entry) => entry.trim())
-    .filter(Boolean);
+  return value.split(",").map((e) => e.trim()).filter(Boolean);
 }
 
 function mergeWorkspacePresets(presets: AppConfig["workspacePresets"] | undefined) {
   return (presets ?? [])
-    .filter((preset) => preset.name?.trim() || preset.rootPath?.trim())
-    .map((preset) => ({
-      id: preset.id?.trim() || crypto.randomUUID(),
-      name: preset.name.trim(),
-      rootPath: preset.rootPath.trim(),
-      writable: preset.writable !== false,
-      allowedProviders: [...new Set((preset.allowedProviders ?? []).map((entry) => entry.trim()).filter(Boolean))],
-      allowedAgents: [...new Set((preset.allowedAgents ?? []).map((entry) => entry.trim()).filter(Boolean))],
+    .filter((p) => p.name?.trim() || p.rootPath?.trim())
+    .map((p) => ({
+      id: p.id?.trim() || crypto.randomUUID(),
+      name: p.name.trim(),
+      rootPath: p.rootPath.trim(),
+      writable: p.writable !== false,
+      allowedProviders: [...new Set((p.allowedProviders ?? []).map((e) => e.trim()).filter(Boolean))],
+      allowedAgents: [...new Set((p.allowedAgents ?? []).map((e) => e.trim()).filter(Boolean))],
     }))
-    .filter((preset) => preset.name && preset.rootPath);
+    .filter((p) => p.name && p.rootPath);
 }
 
-function mergeWorkspaceGrantRoots(
-  roots: string[] | undefined,
-  presets: AppConfig["workspacePresets"] | undefined,
-) {
+function mergeWorkspaceGrantRoots(roots: string[] | undefined, presets: AppConfig["workspacePresets"] | undefined) {
   const next = new Set<string>();
-  for (const root of roots ?? []) {
-    if (root.trim()) next.add(root.trim());
-  }
-  for (const preset of presets ?? []) {
-    if (preset.rootPath?.trim()) next.add(preset.rootPath.trim());
-  }
-  return [...next].sort((left, right) => left.localeCompare(right));
+  for (const root of roots ?? []) { if (root.trim()) next.add(root.trim()); }
+  for (const preset of presets ?? []) { if (preset.rootPath?.trim()) next.add(preset.rootPath.trim()); }
+  return [...next].sort((a, b) => a.localeCompare(b));
 }
 
 function ensureBootstrapSelections() {
   if (!providerBootstrapWorkspaceId.value && workspaceOptions.value.length > 0) {
-    providerBootstrapWorkspaceId.value =
-      draft.defaultWorkspaceId || workspaceOptions.value[0].id;
+    providerBootstrapWorkspaceId.value = draft.defaultWorkspaceId || workspaceOptions.value[0].id;
   }
   if (!providerBootstrapAgentId.value && bootstrapAgents.value.length > 0) {
     providerBootstrapAgentId.value = bootstrapAgents.value[0].id;
@@ -820,25 +872,23 @@ function ensureBootstrapSelections() {
 }
 
 async function pickWorkspaceRoot(index: number) {
-  const selection = await open({
-    directory: true,
-    multiple: false,
-    title: "select workspace root",
-  });
-  if (typeof selection === "string") {
-    draft.workspacePresets[index].rootPath = selection;
-  }
+  const selection = await open({ directory: true, multiple: false, title: "Select workspace root" });
+  if (typeof selection === "string") draft.workspacePresets[index].rootPath = selection;
 }
 
 async function pickGrantRoot(index: number) {
-  const selection = await open({
-    directory: true,
-    multiple: false,
-    title: "select workspace grant root",
-  });
-  if (typeof selection === "string") {
-    draft.workspaceGrantRoots[index] = selection;
-  }
+  const selection = await open({ directory: true, multiple: false, title: "Select allowed root path" });
+  if (typeof selection === "string") draft.workspaceGrantRoots[index] = selection;
+}
+
+async function pickVaultPath() {
+  const selection = await open({ directory: true, multiple: false, title: "Select Obsidian vault folder" });
+  if (typeof selection === "string") draft.vaultPath = selection;
+}
+
+async function pickRepoRootPath() {
+  const selection = await open({ directory: true, multiple: false, title: "Select local repos folder" });
+  if (typeof selection === "string") draft.repoRootPath = selection;
 }
 
 function lanePrefValue(kind: (typeof laneOptions)[number]["kind"]) {
@@ -850,21 +900,13 @@ function lanePrefValue(kind: (typeof laneOptions)[number]["kind"]) {
 
 function setLanePref(kind: (typeof laneOptions)[number]["kind"], value: (typeof laneModes)[number]["value"]) {
   const next = { ...(draft.taskLanePrefs ?? {}) };
-  if (value === "smart") {
-    delete next[kind];
-  } else {
-    next[kind] = value === "collapsed";
-  }
+  if (value === "smart") { delete next[kind]; } else { next[kind] = value === "collapsed"; }
   draft.taskLanePrefs = next;
 }
 
 async function openExternal(url: string) {
   if (!url) return;
-  try {
-    await shellOpen(url);
-  } catch {
-    window.open(url, "_blank");
-  }
+  try { await shellOpen(url); } catch { window.open(url, "_blank"); }
 }
 
 async function probeProvider(providerId: string) {
@@ -877,12 +919,7 @@ async function probeProvider(providerId: string) {
   } catch (error) {
     providerProbeResults.value = {
       ...providerProbeResults.value,
-      [providerId]: {
-        providerId,
-        command: "",
-        launchable: false,
-        summary: `probe failed: ${String(error)}`,
-      },
+      [providerId]: { providerId, command: "", launchable: false, summary: `probe failed: ${String(error)}` },
     };
   } finally {
     probingProviders.value = { ...probingProviders.value, [providerId]: false };
@@ -892,31 +929,19 @@ async function probeProvider(providerId: string) {
 function requireBootstrapTarget(providerId: string) {
   ensureBootstrapSelections();
   if (!providerBootstrapWorkspaceId.value) {
-    providerActionResults.value = {
-      ...providerActionResults.value,
-      [providerId]: "select a bootstrap workspace first",
-    };
+    providerActionResults.value = { ...providerActionResults.value, [providerId]: "select a target workspace first" };
     return null;
   }
-  return {
-    workspaceId: providerBootstrapWorkspaceId.value,
-    agentId: providerBootstrapAgentId.value || undefined,
-  };
+  return { workspaceId: providerBootstrapWorkspaceId.value, agentId: providerBootstrapAgentId.value || undefined };
 }
 
 async function checkProviderAuth(providerId: string) {
   providerActionBusy.value = { ...providerActionBusy.value, [providerId]: true };
   try {
     const result = await invoke<ProviderAuthState>("get_provider_auth_state", { providerId });
-    providerActionResults.value = {
-      ...providerActionResults.value,
-      [providerId]: result.summary,
-    };
+    providerActionResults.value = { ...providerActionResults.value, [providerId]: result.summary };
   } catch (error) {
-    providerActionResults.value = {
-      ...providerActionResults.value,
-      [providerId]: `auth check failed: ${String(error)}`,
-    };
+    providerActionResults.value = { ...providerActionResults.value, [providerId]: `auth check failed: ${String(error)}` };
   } finally {
     providerActionBusy.value = { ...providerActionBusy.value, [providerId]: false };
   }
@@ -931,19 +956,10 @@ async function refreshProviderChecklist(providerId: string) {
       providerId,
       workspaceId: target.workspaceId,
     });
-    providerChecklists.value = {
-      ...providerChecklists.value,
-      [providerId]: result,
-    };
-    providerActionResults.value = {
-      ...providerActionResults.value,
-      [providerId]: result.summary,
-    };
+    providerChecklists.value = { ...providerChecklists.value, [providerId]: result };
+    providerActionResults.value = { ...providerActionResults.value, [providerId]: result.summary };
   } catch (error) {
-    providerActionResults.value = {
-      ...providerActionResults.value,
-      [providerId]: `checklist failed: ${String(error)}`,
-    };
+    providerActionResults.value = { ...providerActionResults.value, [providerId]: `checklist failed: ${String(error)}` };
   } finally {
     providerActionBusy.value = { ...providerActionBusy.value, [providerId]: false };
   }
@@ -965,15 +981,9 @@ async function smokeTestProvider(providerId: string) {
       providerId,
       workspaceId: target.workspaceId,
     });
-    providerActionResults.value = {
-      ...providerActionResults.value,
-      [providerId]: result.summary,
-    };
+    providerActionResults.value = { ...providerActionResults.value, [providerId]: result.summary };
   } catch (error) {
-    providerActionResults.value = {
-      ...providerActionResults.value,
-      [providerId]: `smoke test failed: ${String(error)}`,
-    };
+    providerActionResults.value = { ...providerActionResults.value, [providerId]: `smoke test failed: ${String(error)}` };
   } finally {
     providerActionBusy.value = { ...providerActionBusy.value, [providerId]: false };
   }
@@ -990,16 +1000,10 @@ async function writeProviderBootstrap(providerId: string) {
       agentId: target.agentId,
       overwrite: providerBootstrapOverwrite.value,
     });
-    providerActionResults.value = {
-      ...providerActionResults.value,
-      [providerId]: `${result.summary}: ${result.files.join(", ")}`,
-    };
+    providerActionResults.value = { ...providerActionResults.value, [providerId]: `${result.summary}: ${result.files.join(", ")}` };
     await refreshProviderChecklist(providerId);
   } catch (error) {
-    providerActionResults.value = {
-      ...providerActionResults.value,
-      [providerId]: `bootstrap failed: ${String(error)}`,
-    };
+    providerActionResults.value = { ...providerActionResults.value, [providerId]: `bootstrap failed: ${String(error)}` };
   } finally {
     providerActionBusy.value = { ...providerActionBusy.value, [providerId]: false };
   }
@@ -1009,20 +1013,11 @@ async function copyProviderEnv(providerId: string) {
   const target = requireBootstrapTarget(providerId);
   if (!target) return;
   try {
-    const content = await invoke<string>("get_provider_env_template", {
-      providerId,
-      agentId: target.agentId,
-    });
+    const content = await invoke<string>("get_provider_env_template", { providerId, agentId: target.agentId });
     await navigator.clipboard.writeText(content);
-    providerActionResults.value = {
-      ...providerActionResults.value,
-      [providerId]: "worker env copied to clipboard",
-    };
+    providerActionResults.value = { ...providerActionResults.value, [providerId]: "worker env copied to clipboard" };
   } catch (error) {
-    providerActionResults.value = {
-      ...providerActionResults.value,
-      [providerId]: `copy env failed: ${String(error)}`,
-    };
+    providerActionResults.value = { ...providerActionResults.value, [providerId]: `copy env failed: ${String(error)}` };
   }
 }
 
@@ -1032,7 +1027,7 @@ async function checkForUpdates() {
   try {
     lastUpdateCheck.value = await invoke<UpdateCheckResult>("check_for_updates");
   } catch (error) {
-    updateError.value = `update check failed: ${String(error)}`;
+    updateError.value = `Update check failed: ${String(error)}`;
   } finally {
     checkingUpdates.value = false;
   }
@@ -1044,13 +1039,10 @@ async function installUpdate() {
   updateError.value = "";
   try {
     const installed = await invoke<boolean>("install_pending_update");
-    if (!installed) {
-      updateError.value = "no pending update available.";
-      return;
-    }
+    if (!installed) { updateError.value = "No pending update available."; return; }
     lastUpdateCheck.value = null;
   } catch (error) {
-    updateError.value = `update install failed: ${String(error)}`;
+    updateError.value = `Update install failed: ${String(error)}`;
   } finally {
     installingUpdate.value = false;
   }
@@ -1063,15 +1055,12 @@ async function save() {
     await configStore.saveConfig({
       ...draft,
       workspacePresets: mergeWorkspacePresets(draft.workspacePresets),
-      workspaceGrantRoots: mergeWorkspaceGrantRoots(
-        draft.workspaceGrantRoots,
-        draft.workspacePresets,
-      ),
+      workspaceGrantRoots: mergeWorkspaceGrantRoots(draft.workspaceGrantRoots, draft.workspacePresets),
       personaPresets: mergePersonaPresets(draft.personaPresets),
       providerCommands: mergeProviderCommands(draft.providerCommands),
     });
     saved.value = true;
-    setTimeout(() => (saved.value = false), 2000);
+    setTimeout(() => (saved.value = false), 2500);
   } finally {
     saving.value = false;
   }
@@ -1083,66 +1072,222 @@ watch([providerBootstrapWorkspaceId, providerBootstrapAgentId], () => {
 </script>
 
 <style scoped>
-.settings-view {
-  max-width: 860px;
+/* ── Layout ─────────────────────────────────────────────────────── */
+.settings-layout {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ── Left nav ───────────────────────────────────────────────────── */
+.settings-nav {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 0;
+  padding: 20px 12px 16px;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--glass-border);
+  overflow-y: auto;
 }
 
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.page-kicker,
-.card-title,
-.field-label {
-  margin: 0;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.page-title {
-  margin: 0;
-  color: var(--text-primary);
-  font-family: var(--font-display);
-  font-size: 28px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-}
-
-.page-subtitle,
-.field-hint,
-.saved-label {
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.settings-form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.card-title {
+.nav-brand {
+  padding: 0 8px 20px;
+  border-bottom: 1px solid var(--glass-border);
   margin-bottom: 12px;
 }
 
+.nav-kicker {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.nav-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.nav-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+  width: 100%;
+}
+
+.nav-item:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.nav-item.active {
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.nav-icon {
+  font-size: 14px;
+  width: 16px;
+  text-align: center;
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.nav-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--glass-border);
+  margin-top: 12px;
+}
+
+.saved-badge {
+  font-size: 12px;
+  color: var(--accent-success);
+  text-align: center;
+}
+
+/* ── Content panel ──────────────────────────────────────────────── */
+.settings-content {
+  overflow-y: auto;
+  padding: 24px var(--stage-edge-pad, 18px);
+}
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 720px;
+}
+
+.section-header {
+  margin-bottom: 4px;
+}
+
+.section-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--text-primary);
+  margin: 0 0 6px;
+}
+
+.section-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* ── Card internals ─────────────────────────────────────────────── */
+.group-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.group-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+  line-height: 1.6;
+}
+
+/* ── Setting rows ───────────────────────────────────────────────── */
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+}
+
+.setting-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.setting-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.setting-hint {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+
+.setting-divider {
+  height: 1px;
+  background: var(--glass-border);
+  margin: 4px 0;
+}
+
+/* ── Inputs ─────────────────────────────────────────────────────── */
 .field {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin-bottom: 10px;
+  margin-bottom: 14px;
 }
 
 .field:last-child {
   margin-bottom: 0;
+}
+
+.field-label,
+.card-title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.field-input {
+  font-size: 13px;
+  padding: 10px 12px;
 }
 
 .field-row {
@@ -1151,75 +1296,379 @@ watch([providerBootstrapWorkspaceId, providerBootstrapAgentId], () => {
   gap: 12px;
 }
 
-.field-input {
-  font-size: 13px;
-  padding: 10px 12px;
+.field-hint {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.55;
 }
 
-.updater-textarea {
-  min-height: 88px;
-  resize: vertical;
+.success-text {
+  color: var(--accent-success) !important;
 }
 
-.launch-row,
-.provider-row {
+/* ── Path row (input + browse) ──────────────────────────────────── */
+.path-row,
+.grant-row {
   display: flex;
   gap: 8px;
-  align-items: flex-start;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
+  align-items: center;
 }
 
+.path-row .glass-input,
+.grant-row .glass-input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── Number input ───────────────────────────────────────────────── */
+.number-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.number-input {
+  width: 100px;
+}
+
+.unit-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ── Toggle control ─────────────────────────────────────────────── */
+.toggle {
+  position: relative;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-track {
+  display: block;
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--glass-border);
+  position: relative;
+  transition: background 0.18s, border-color 0.18s;
+}
+
+.toggle-track::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  transition: transform 0.18s, background 0.18s;
+}
+
+.toggle input:checked + .toggle-track {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.toggle input:checked + .toggle-track::after {
+  transform: translateX(18px);
+  background: #fff;
+}
+
+/* ── Inline checkbox ─────────────────────────────────────────────── */
+.inline-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.checkbox-row.compact {
+  margin-bottom: 0;
+}
+
+/* ── Theme swatches ─────────────────────────────────────────────── */
+.theme-swatches {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.theme-swatch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--glass-border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.theme-swatch:hover {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.theme-swatch.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.swatch-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Workspace card ─────────────────────────────────────────────── */
 .workspace-card {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  margin-bottom: 10px;
-  padding: 12px;
+  margin-bottom: 12px;
+  padding: 14px;
   border-radius: var(--radius-lg);
-  border: 1px solid color-mix(in srgb, var(--glass-border) 80%, transparent);
-  background: color-mix(in srgb, var(--bg-secondary) 88%, transparent);
+  border: 1px solid var(--glass-border);
+  background: color-mix(in srgb, var(--bg-secondary) 60%, transparent);
 }
 
-.workspace-row__head,
-.workspace-actions,
-.grant-row,
-.provider-bootstrap-grid,
-.workspace-grid {
+.workspace-row__head {
   display: flex;
   gap: 8px;
   align-items: center;
   flex-wrap: wrap;
 }
 
-.provider-bootstrap-grid,
+.workspace-name {
+  flex: 1;
+  min-width: 120px;
+}
+
+.workspace-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+}
+
 .workspace-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+/* ── Provider block ─────────────────────────────────────────────── */
+.provider-bootstrap-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.provider-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--glass-border);
+  background: color-mix(in srgb, var(--bg-secondary) 50%, transparent);
   margin-bottom: 10px;
 }
 
-.workspace-name {
+.provider-block__header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.provider-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 140px;
+  flex-shrink: 0;
+}
+
+.provider-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.provider-hint,
+.provider-template {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
+.provider-command {
   flex: 1;
+  min-width: 0;
 }
 
-.grant-row {
-  margin-bottom: 8px;
+.provider-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
-.grant-row .glass-input {
+.provider-result {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.provider-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.checklist-item {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+}
+
+.checklist-item.ready {
+  background: color-mix(in srgb, var(--accent-success) 10%, transparent);
+  color: var(--accent-success);
+}
+
+.checklist-item.missing {
+  background: color-mix(in srgb, var(--accent-error) 8%, transparent);
+  color: var(--accent-error);
+}
+
+.checklist-status {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+/* ── Token table ─────────────────────────────────────────────────── */
+.token-table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.token-row {
+  display: grid;
+  grid-template-columns: 100px 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: var(--radius-md);
+}
+
+.token-row--head {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding-bottom: 4px;
+}
+
+.token-row:not(.token-row--head) {
+  background: color-mix(in srgb, var(--bg-secondary) 50%, transparent);
+}
+
+.token-agent {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.token-value-cell {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.token-input {
   flex: 1;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
 }
 
+.token-actions-cell {
+  display: flex;
+  gap: 6px;
+}
+
+.token-action {
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.token-action:hover {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+.token-action--danger:hover {
+  background: color-mix(in srgb, var(--accent-error) 12%, transparent);
+  color: var(--accent-error);
+  border-color: var(--accent-error);
+}
+
+/* ── Persona rows ────────────────────────────────────────────────── */
 .persona-row {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-bottom: 10px;
   padding: 12px;
   border-radius: var(--radius-lg);
-  border: 1px solid color-mix(in srgb, var(--glass-border) 80%, transparent);
-  background: color-mix(in srgb, var(--bg-secondary) 88%, transparent);
+  border: 1px solid var(--glass-border);
+  background: color-mix(in srgb, var(--bg-secondary) 50%, transparent);
+  margin-bottom: 10px;
 }
 
 .persona-row__head {
@@ -1233,97 +1682,29 @@ watch([providerBootstrapWorkspaceId, providerBootstrapAgentId], () => {
 }
 
 .persona-prompt {
-  min-height: 100px;
+  min-height: 80px;
   resize: vertical;
 }
 
-.provider-copy {
-  width: 160px;
+/* ── Launch rows ─────────────────────────────────────────────────── */
+.launch-row {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.provider-name {
-  color: var(--text-primary);
-  font-weight: 600;
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.provider-hint {
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 11px;
-}
-
-.provider-template,
-.provider-result {
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.5;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
 }
 
 .launch-name {
-  width: 140px;
+  width: 160px;
 }
 
 .launch-path {
   flex: 1;
+  min-width: 200px;
 }
 
-.provider-command {
-  flex: 1;
-}
-
-.provider-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.provider-overwrite-row {
-  margin-bottom: 12px;
-}
-
-.provider-checklist {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  width: 100%;
-  margin-top: 6px;
-}
-
-.checklist-item {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 10px;
-  border-radius: var(--radius-lg);
-  border: 1px solid color-mix(in srgb, var(--glass-border) 82%, transparent);
-  background: color-mix(in srgb, var(--bg-secondary) 92%, transparent);
-}
-
-.checklist-item.ready {
-  border-color: color-mix(in srgb, var(--accent-success) 32%, transparent);
-}
-
-.checklist-item.missing {
-  border-color: color-mix(in srgb, var(--accent-warning) 28%, transparent);
-}
-
-.form-actions,
-.doc-links,
-.theme-swatches,
-.lane-pref-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
+/* ── Lane prefs ──────────────────────────────────────────────────── */
 .lane-pref-list {
   display: flex;
   flex-direction: column;
@@ -1334,14 +1715,8 @@ watch([providerBootstrapWorkspaceId, providerBootstrapAgentId], () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 14px;
-  padding: 10px 0;
-  border-top: 1px solid color-mix(in srgb, var(--glass-border) 84%, transparent);
-}
-
-.lane-pref-row:first-child {
-  padding-top: 0;
-  border-top: 0;
+  gap: 12px;
+  padding: 8px 0;
 }
 
 .lane-copy {
@@ -1351,218 +1726,67 @@ watch([providerBootstrapWorkspaceId, providerBootstrapAgentId], () => {
 }
 
 .lane-name {
-  color: var(--text-primary);
+  font-size: 13px;
   font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  font-size: 12px;
+  color: var(--text-primary);
+  text-transform: capitalize;
 }
 
 .lane-hint {
+  font-size: 11px;
   color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.5;
+}
+
+.lane-pref-actions {
+  display: flex;
+  gap: 4px;
 }
 
 .lane-mode {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 7px 12px;
-  border-radius: var(--radius-pill);
-  border: none;
-  background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border);
+  background: transparent;
   color: var(--text-secondary);
+  font-size: 12px;
   cursor: pointer;
-  transition: color 0.16s ease, background 0.16s ease;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 
-.lane-mode:hover,
-.lane-mode.active {
-  background: color-mix(in srgb, var(--accent) 14%, var(--bg-surface));
-  color: var(--accent);
-}
-
-.saved-label {
-  color: var(--accent-success);
-}
-
-.checkbox-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  color: var(--text-secondary);
-  font-size: 13px;
-}
-
-.checkbox-row.compact {
-  gap: 6px;
-}
-
-.checkbox-row input {
-  width: 14px;
-  height: 14px;
-  accent-color: var(--accent);
-}
-
-.field-hint code {
-  font-family: var(--font-mono);
-  color: var(--accent-secondary);
-  font-size: 11px;
-}
-
-.theme-swatch {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 12px;
-  border-radius: var(--radius-pill);
-  border: none;
-  background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: color 0.16s ease, background 0.16s ease;
-}
-
-.theme-swatch:hover,
-.theme-swatch.active {
-  background: color-mix(in srgb, var(--accent) 14%, var(--bg-surface));
-  color: var(--accent);
-}
-
-.swatch-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-:global([data-theme="light"]) .theme-swatch {
-  background: rgba(255, 255, 255, 0.88);
-  border-color: rgba(15, 23, 42, 0.08);
-}
-
-:global([data-theme="light"]) .lane-mode {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(15, 23, 42, 0.12);
-}
-
-:global([data-theme="light"]) .theme-swatch:hover,
-:global([data-theme="light"]) .theme-swatch.active,
-:global([data-theme="light"]) .lane-mode:hover,
-:global([data-theme="light"]) .lane-mode.active {
-  border-color: rgba(8, 145, 178, 0.2);
-  background: rgba(240, 249, 255, 0.96);
-}
-
-.token-table {
-  display: flex;
-  flex-direction: column;
-}
-
-.token-row {
-  display: grid;
-  grid-template-columns: 120px minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
-  padding: 10px 0;
-  border-top: 1px solid color-mix(in srgb, var(--glass-border) 62%, transparent);
-}
-
-.token-row--head {
-  padding-top: 0;
-  border-top: 0;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-.token-agent {
-  font-family: var(--font-display);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.token-value-cell {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.token-input {
-  flex: 1;
-  font-family: var(--font-mono);
-  font-size: 11px;
-  padding: 6px 10px;
-  letter-spacing: 0.04em;
-  user-select: all;
-}
-
-.token-actions-cell {
-  display: flex;
-  gap: 6px;
-}
-
-.token-action {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  padding: 4px 8px;
-  border-radius: var(--radius-pill);
-  border: 1px solid color-mix(in srgb, var(--glass-border) 88%, transparent);
-  background: color-mix(in srgb, var(--glass-bg) 78%, transparent);
-  color: var(--text-secondary);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.token-action:hover {
+.lane-mode:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
 
-.token-action--danger:hover {
-  border-color: var(--accent-error);
-  color: var(--accent-error);
+.lane-mode.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
 }
 
-@media (max-width: 760px) {
-  .field-row {
-    grid-template-columns: 1fr;
-  }
+/* ── Updater textarea ────────────────────────────────────────────── */
+.updater-textarea {
+  min-height: 60px;
+  resize: vertical;
+}
 
-  .launch-row,
-  .provider-row,
-  .persona-row__head,
-  .workspace-row__head {
-    flex-direction: column;
-    align-items: stretch;
-  }
+/* ── Doc links ───────────────────────────────────────────────────── */
+.doc-links {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
 
-  .provider-bootstrap-grid,
-  .workspace-grid {
-    grid-template-columns: 1fr;
-  }
+/* ── Fade transition ─────────────────────────────────────────────── */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s;
+}
 
-  .lane-pref-row {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .launch-name {
-    width: 100%;
-  }
-
-  .token-row {
-    grid-template-columns: 1fr;
-  }
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>
