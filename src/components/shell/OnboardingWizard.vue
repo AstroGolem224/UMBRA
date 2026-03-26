@@ -100,15 +100,19 @@ const steps = [
 ];
 
 async function pickFolder(target: "vault" | "repo") {
+  const isTauri = Boolean((window as any).__TAURI_INTERNALS__);
+  if (!isTauri) return;
   try {
     const { open } = await import("@tauri-apps/plugin-dialog");
     const selection = await open({ directory: true, multiple: false, title: `select ${target} path` });
     if (typeof selection === "string") {
-      if (target === "vault") vaultPath.value = selection;
-      else repoRootPath.value = selection;
+      // normalize backslashes to forward slashes for consistency
+      const normalized = selection.replace(/\\/g, "/");
+      if (target === "vault") vaultPath.value = normalized;
+      else repoRootPath.value = normalized;
     }
-  } catch {
-    // Browser mode — no file picker
+  } catch (e) {
+    console.error("folder picker failed:", e);
   }
 }
 
