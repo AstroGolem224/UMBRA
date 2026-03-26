@@ -7,7 +7,10 @@ use crate::state::AppState;
 
 /// Launch an IDE/app by target ID. Only targets defined in config are allowed.
 #[tauri::command]
-pub async fn launch_target(target_id: String, state: State<'_, AppState>) -> std::result::Result<(), AppError> {
+pub async fn launch_target(
+    target_id: String,
+    state: State<'_, AppState>,
+) -> std::result::Result<(), AppError> {
     let cfg = state.config.read().await;
     let target = cfg
         .launch_targets
@@ -37,7 +40,9 @@ pub async fn launch_target(target_id: String, state: State<'_, AppState>) -> std
 #[tauri::command]
 pub async fn open_github_url(url: String) -> std::result::Result<(), AppError> {
     if !url.starts_with("https://github.com/") {
-        return Err(AppError::TargetNotAllowed(format!("Not a GitHub URL: {url}")));
+        return Err(AppError::TargetNotAllowed(format!(
+            "Not a GitHub URL: {url}"
+        )));
     }
     open_url(&url)?;
     Ok(())
@@ -45,11 +50,18 @@ pub async fn open_github_url(url: String) -> std::result::Result<(), AppError> {
 
 /// Open a GitHub repository in the system browser.
 #[tauri::command]
-pub async fn open_github(owner: String, repo: String, state: State<'_, AppState>) -> std::result::Result<(), AppError> {
+pub async fn open_github(
+    owner: String,
+    repo: String,
+    state: State<'_, AppState>,
+) -> std::result::Result<(), AppError> {
     let cfg = state.config.read().await;
 
     // Verify the repo is in the configured github_targets whitelist
-    let allowed = cfg.github_targets.iter().any(|t| t.owner == owner && t.repo == repo);
+    let allowed = cfg
+        .github_targets
+        .iter()
+        .any(|t| t.owner == owner && t.repo == repo);
     drop(cfg);
 
     if !allowed {
@@ -63,14 +75,20 @@ pub async fn open_github(owner: String, repo: String, state: State<'_, AppState>
 }
 
 #[tauri::command]
-pub async fn open_local_repo_folder(repo_name: String, state: State<'_, AppState>) -> std::result::Result<(), AppError> {
+pub async fn open_local_repo_folder(
+    repo_name: String,
+    state: State<'_, AppState>,
+) -> std::result::Result<(), AppError> {
     let repo_path = resolve_local_repo_path(&repo_name, &state).await?;
     open_folder(&repo_path)?;
     Ok(())
 }
 
 #[tauri::command]
-pub async fn open_local_repo_terminal(repo_name: String, state: State<'_, AppState>) -> std::result::Result<(), AppError> {
+pub async fn open_local_repo_terminal(
+    repo_name: String,
+    state: State<'_, AppState>,
+) -> std::result::Result<(), AppError> {
     let repo_path = resolve_local_repo_path(&repo_name, &state).await?;
     open_terminal(&repo_path)?;
     Ok(())
@@ -155,7 +173,11 @@ fn open_folder(path: &Path) -> Result<()> {
 fn open_terminal(path: &Path) -> Result<()> {
     let escaped = path.display().to_string().replace('\'', "''");
     std::process::Command::new("powershell")
-        .args(["-NoExit", "-Command", &format!("Set-Location -LiteralPath '{escaped}'")])
+        .args([
+            "-NoExit",
+            "-Command",
+            &format!("Set-Location -LiteralPath '{escaped}'"),
+        ])
         .spawn()
         .map_err(AppError::Io)?;
     Ok(())
@@ -188,7 +210,10 @@ mod tests {
             ("code | evil", true),
         ];
         for (path, should_reject) in paths {
-            let has_meta = path.contains(';') || path.contains('&') || path.contains('|') || path.contains('`');
+            let has_meta = path.contains(';')
+                || path.contains('&')
+                || path.contains('|')
+                || path.contains('`');
             assert_eq!(has_meta, should_reject, "path: {path}");
         }
     }

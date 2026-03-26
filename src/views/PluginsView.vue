@@ -394,17 +394,25 @@ onMounted(refresh);
 .broker-score {
   padding: 5px 9px;
   border-radius: var(--radius-pill);
-  border: 1px solid color-mix(in srgb, var(--glass-border) 88%, transparent);
-  background: color-mix(in srgb, var(--glass-bg) 82%, transparent);
+  border: none;
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
 }
 
 .status-pill.ok {
-  color: var(--accent-success);
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
 }
 
 .status-pill.err,
 .plugin-error {
   color: var(--accent-error);
+  background: rgba(239, 68, 68, 0.10);
+}
+
+.reason-pill,
+.broker-score {
+  color: var(--accent);
+  background: var(--accent-dim);
 }
 
 .stat-label {
@@ -543,10 +551,19 @@ onMounted(refresh);
   border-color: rgba(15, 23, 42, 0.08);
 }
 
-:global([data-theme="light"]) .status-pill,
+:global([data-theme="light"]) .status-pill {
+  background: rgba(241, 245, 249, 0.7);
+}
+
+:global([data-theme="light"]) .status-pill.ok {
+  color: #166534;
+  background: rgba(220, 252, 231, 0.7);
+}
+
 :global([data-theme="light"]) .reason-pill,
 :global([data-theme="light"]) .broker-score {
-  background: rgba(255, 255, 255, 0.88);
+  color: #0e7490;
+  background: rgba(207, 250, 254, 0.6);
 }
 
 @media (max-width: 960px) {

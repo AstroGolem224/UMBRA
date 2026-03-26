@@ -7,6 +7,7 @@
     >
       <template #meta>
         <span class="view-hero-pill">{{ draft.theme }} active</span>
+        <span class="view-hero-pill">{{ draft.closeToTray ? "close hides" : "close exits" }}</span>
         <span class="view-hero-pill">{{ draft.pmToolPollSeconds }}s pm poll</span>
       </template>
     </ViewHero>
@@ -33,6 +34,24 @@
       </GlassCard>
 
       <GlassCard>
+        <h3 class="card-title">system tray</h3>
+        <label class="checkbox-row">
+          <input v-model="draft.closeToTray" type="checkbox" />
+          <span>hide to tray when the main window is closed</span>
+        </label>
+        <p class="field-hint">
+          tray menu exposes `show`, `hide`, `sync pm now`, and `quit`. when this is off, the window close button exits the app normally.
+        </p>
+        <label class="checkbox-row" style="margin-top: 12px">
+          <input v-model="autostart" type="checkbox" @change="toggleAutostart" />
+          <span>start UMBRA automatically when you log in</span>
+        </label>
+        <p class="field-hint">
+          launches minimized in the system tray. uses the OS native autostart mechanism.
+        </p>
+      </GlassCard>
+
+      <GlassCard>
         <h3 class="card-title">obsidian vault</h3>
         <div class="field">
           <label class="field-label">vault path</label>
@@ -52,6 +71,192 @@
           <NeonButton variant="danger" size="sm" ghost @click="draft.launchTargets!.splice(i, 1)">delete</NeonButton>
         </div>
         <NeonButton size="sm" variant="secondary" @click="addLaunchTarget">+ add target</NeonButton>
+      </GlassCard>
+
+      <GlassCard>
+        <h3 class="card-title">workspaces</h3>
+        <div v-for="(workspace, index) in draft.workspacePresets" :key="workspace.id" class="workspace-card">
+          <div class="workspace-row__head">
+            <input v-model="workspace.name" class="glass-input workspace-name" placeholder="workspace name" />
+            <label class="checkbox-row compact">
+              <input v-model="workspace.writable" type="checkbox" />
+              <span>writable</span>
+            </label>
+            <label class="checkbox-row compact">
+              <input
+                :checked="draft.defaultWorkspaceId === workspace.id"
+                type="radio"
+                name="default-workspace"
+                @change="draft.defaultWorkspaceId = workspace.id"
+              />
+              <span>default</span>
+            </label>
+            <NeonButton variant="danger" size="sm" ghost @click="draft.workspacePresets.splice(index, 1)">delete</NeonButton>
+          </div>
+          <div class="grant-row">
+            <input v-model="workspace.rootPath" class="glass-input" placeholder="absolute workspace path" />
+            <NeonButton size="sm" variant="secondary" ghost @click="pickWorkspaceRoot(index)">pick folder</NeonButton>
+          </div>
+          <div class="workspace-grid">
+            <label class="field">
+              <label class="field-label">allowed providers</label>
+              <input
+                :value="workspaceProvidersValue(workspace)"
+                class="glass-input"
+                placeholder="codex, claude"
+                @input="setWorkspaceProviders(workspace, ($event.target as HTMLInputElement).value)"
+              />
+            </label>
+            <label class="field">
+              <label class="field-label">allowed agents</label>
+              <input
+                :value="workspaceAgentsValue(workspace)"
+                class="glass-input"
+                placeholder="codex-main, claude-main"
+                @input="setWorkspaceAgents(workspace, ($event.target as HTMLInputElement).value)"
+              />
+            </label>
+          </div>
+        </div>
+        <div class="workspace-actions">
+          <NeonButton size="sm" variant="secondary" @click="addWorkspacePreset">+ add workspace</NeonButton>
+          <NeonButton size="sm" variant="secondary" ghost @click="seedWorkspaceGrantRoots">grant current workspaces</NeonButton>
+        </div>
+        <div class="field">
+          <label class="field-label">workspace grant roots</label>
+          <div v-for="(root, index) in draft.workspaceGrantRoots" :key="`${root}-${index}`" class="grant-row">
+            <input v-model="draft.workspaceGrantRoots[index]" class="glass-input" placeholder="allowed root path" />
+            <NeonButton size="sm" variant="secondary" ghost @click="pickGrantRoot(index)">pick folder</NeonButton>
+            <NeonButton variant="danger" size="sm" ghost @click="draft.workspaceGrantRoots.splice(index, 1)">delete</NeonButton>
+          </div>
+          <NeonButton size="sm" variant="secondary" ghost @click="addWorkspaceGrantRoot">+ add grant root</NeonButton>
+        </div>
+        <p class="field-hint">
+          every run must resolve into one of these roots. UMBRA now rejects dispatches outside this explicit allowlist, even if a workspace preset exists.
+        </p>
+      </GlassCard>
+
+      <GlassCard>
+        <h3 class="card-title">personas</h3>
+        <div v-for="(persona, index) in draft.personaPresets" :key="persona.id" class="persona-row">
+          <div class="persona-row__head">
+            <input v-model="persona.name" class="glass-input persona-name" placeholder="persona name" />
+            <NeonButton variant="danger" size="sm" ghost @click="draft.personaPresets.splice(index, 1)">delete</NeonButton>
+          </div>
+          <input v-model="persona.description" class="glass-input" placeholder="short description" />
+          <textarea
+            v-model="persona.prompt"
+            class="glass-input persona-prompt"
+            rows="4"
+            placeholder="system-style prompt fragment for this persona"
+          />
+        </div>
+        <NeonButton size="sm" variant="secondary" @click="addPersonaPreset">+ add persona</NeonButton>
+      </GlassCard>
+
+      <GlassCard>
+        <h3 class="card-title">workbench providers</h3>
+        <div class="provider-bootstrap-grid">
+          <label class="field">
+            <span class="field-label">bootstrap workspace</span>
+            <select v-model="providerBootstrapWorkspaceId" class="glass-input">
+              <option value="">select workspace</option>
+              <option v-for="workspace in workspaceOptions" :key="workspace.id" :value="workspace.id">
+                {{ workspace.name }}
+              </option>
+            </select>
+          </label>
+          <label class="field">
+            <span class="field-label">bootstrap agent</span>
+            <select v-model="providerBootstrapAgentId" class="glass-input">
+              <option value="">select agent</option>
+              <option v-for="agent in bootstrapAgents" :key="agent.id" :value="agent.id">
+                {{ agent.name }} · {{ agent.id }}
+              </option>
+            </select>
+          </label>
+        </div>
+        <label class="checkbox-row compact provider-overwrite-row">
+          <input v-model="providerBootstrapOverwrite" type="checkbox" />
+          <span>overwrite existing bootstrap files</span>
+        </label>
+        <div v-for="provider in draft.providerCommands" :key="provider.providerId" class="provider-row">
+          <div class="provider-copy">
+            <span class="provider-name">{{ providerLabel(provider.providerId) }}</span>
+            <span class="provider-hint">{{ provider.providerId }}</span>
+            <span class="provider-template">template: {{ providerTemplate(provider.providerId) }}</span>
+          </div>
+          <input
+            v-model="provider.command"
+            class="glass-input provider-command"
+            :placeholder="provider.providerId"
+          />
+          <div class="provider-actions">
+            <NeonButton size="sm" variant="secondary" ghost @click="checkProviderAuth(provider.providerId)">
+              auth
+            </NeonButton>
+            <NeonButton
+              size="sm"
+              variant="secondary"
+              ghost
+              :loading="Boolean(providerActionBusy[provider.providerId])"
+              @click="refreshProviderChecklist(provider.providerId)"
+            >
+              checklist
+            </NeonButton>
+            <NeonButton
+              size="sm"
+              variant="secondary"
+              ghost
+              :loading="Boolean(providerActionBusy[provider.providerId])"
+              @click="smokeTestProvider(provider.providerId)"
+            >
+              smoke
+            </NeonButton>
+            <NeonButton size="sm" variant="secondary" ghost @click="writeProviderBootstrap(provider.providerId)">
+              write bootstrap
+            </NeonButton>
+            <NeonButton size="sm" variant="secondary" ghost @click="copyProviderEnv(provider.providerId)">
+              copy env
+            </NeonButton>
+            <NeonButton
+              size="sm"
+              variant="secondary"
+              ghost
+              :loading="Boolean(probingProviders[provider.providerId])"
+              @click="probeProvider(provider.providerId)"
+            >
+              probe
+            </NeonButton>
+            <NeonButton size="sm" variant="secondary" ghost @click="openExternal(providerDocs(provider.providerId))">
+              docs
+            </NeonButton>
+          </div>
+          <span v-if="providerProbeResults[provider.providerId]" class="provider-result">
+            {{ providerProbeResults[provider.providerId]?.summary }}
+          </span>
+          <span v-if="providerActionResults[provider.providerId]" class="provider-result">
+            {{ providerActionResults[provider.providerId] }}
+          </span>
+          <div v-if="providerChecklists[provider.providerId]" class="provider-checklist">
+            <div
+              v-for="item in providerChecklists[provider.providerId]?.items ?? []"
+              :key="`${provider.providerId}-${item.key}`"
+              class="checklist-item"
+              :class="{ ready: item.ready, missing: !item.ready }"
+            >
+              <strong>{{ item.ready ? "ready" : "todo" }}</strong>
+              <span>{{ item.label }}</span>
+              <span class="provider-result">{{ item.detail }}</span>
+            </div>
+          </div>
+        </div>
+        <p class="field-hint">
+          set the exact executable UMBRA should launch for each provider. bootstrap actions use the selected workspace + agent, write instruction files into the repo, and can copy a ready worker env with the per-agent UAP token.
+        </p>
+        <div class="doc-links">
+          <NeonButton size="sm" variant="secondary" ghost @click="openExternal(agentSetupGuideUrl)">setup guide</NeonButton>
+        </div>
       </GlassCard>
 
       <GlassCard>
@@ -165,10 +370,45 @@
             <input v-model.number="draft.uapPort" class="field-input glass-input" type="number" min="1" max="65535" />
           </div>
           <div class="field">
-            <label class="field-label">agent token</label>
+            <label class="field-label">legacy shared token</label>
             <input v-model="draft.uapToken" class="field-input glass-input" type="text" autocomplete="off" />
           </div>
         </div>
+        <p class="field-hint">runtime auth now uses per-agent tokens. this legacy field is retained for compatibility only.</p>
+      </GlassCard>
+
+      <GlassCard>
+        <h3 class="card-title">agent auth tokens</h3>
+        <p class="field-hint" style="margin-bottom: 12px">
+          each agent authenticates via its own <code>X-Agent-Token</code> header.
+          tokens are auto-generated on first run. use <strong>regenerate</strong> to rotate a token — the agent must update its config accordingly.
+        </p>
+        <div class="token-table">
+          <div class="token-row token-row--head">
+            <span>agent</span>
+            <span>token</span>
+            <span>actions</span>
+          </div>
+          <div v-for="(token, agentId) in agentTokenEntries" :key="agentId" class="token-row">
+            <span class="token-agent">{{ agentId }}</span>
+            <div class="token-value-cell">
+              <input
+                :value="tokenVisible[String(agentId)] ? token : '••••••••••••••••'"
+                class="glass-input token-input"
+                type="text"
+                readonly
+              />
+              <button type="button" class="token-action" title="toggle visibility" @click="toggleTokenVisibility(String(agentId))">
+                {{ tokenVisible[String(agentId)] ? "hide" : "show" }}
+              </button>
+              <button type="button" class="token-action" title="copy to clipboard" @click="copyToken(String(token))">copy</button>
+            </div>
+            <div class="token-actions-cell">
+              <button type="button" class="token-action token-action--danger" @click="regenerateToken(String(agentId))">regenerate</button>
+            </div>
+          </div>
+        </div>
+        <p v-if="tokenCopied" class="field-hint" style="color: var(--accent-success)">token copied to clipboard.</p>
       </GlassCard>
 
       <GlassCard>
@@ -198,15 +438,26 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from "vue";
+import { computed, onMounted, reactive, ref, watch } from "vue";
 import { invoke } from "@tauri-apps/api/core";
+import { open } from "@tauri-apps/plugin-dialog";
 import { open as shellOpen } from "@tauri-apps/plugin-shell";
 import ViewHero from "@/components/layout/ViewHero.vue";
-import type { AppConfig, UpdateCheckResult } from "@/interfaces";
+import type {
+  AppConfig,
+  ProviderAuthState,
+  ProviderProbeResult,
+  ProviderSetupChecklistResult,
+  UpdateCheckResult,
+  WorkspaceBootstrapResult,
+  WorkspacePreset,
+} from "@/interfaces";
+import { useAgentStore } from "@/stores/useAgentStore";
 import { useConfigStore } from "@/stores/useConfigStore";
 import GlassCard from "@/components/ui/GlassCard.vue";
 import NeonButton from "@/components/ui/NeonButton.vue";
 
+const agentStore = useAgentStore();
 const configStore = useConfigStore();
 const saving = ref(false);
 const saved = ref(false);
@@ -214,6 +465,40 @@ const checkingUpdates = ref(false);
 const installingUpdate = ref(false);
 const lastUpdateCheck = ref<UpdateCheckResult | null>(null);
 const updateError = ref("");
+const providerProbeResults = ref<Record<string, ProviderProbeResult | null>>({});
+const probingProviders = ref<Record<string, boolean>>({});
+const providerActionResults = ref<Record<string, string>>({});
+const autostart = ref(false);
+const providerActionBusy = ref<Record<string, boolean>>({});
+const providerChecklists = ref<Record<string, ProviderSetupChecklistResult | null>>({});
+const tokenVisible = ref<Record<string, boolean>>({});
+const tokenCopied = ref(false);
+
+const agentTokenEntries = computed(() => {
+  const tokens = draft.agentAuthTokens ?? {};
+  const sorted = Object.entries(tokens).sort(([a], [b]) => a.localeCompare(b));
+  return Object.fromEntries(sorted);
+});
+
+function toggleTokenVisibility(agentId: string) {
+  tokenVisible.value = { ...tokenVisible.value, [agentId]: !tokenVisible.value[agentId] };
+}
+
+async function copyToken(token: string) {
+  try {
+    await navigator.clipboard.writeText(token);
+    tokenCopied.value = true;
+    setTimeout(() => { tokenCopied.value = false; }, 2000);
+  } catch { /* clipboard not available */ }
+}
+
+function regenerateToken(agentId: string) {
+  if (!draft.agentAuthTokens) draft.agentAuthTokens = {};
+  draft.agentAuthTokens[agentId] = crypto.randomUUID();
+}
+const providerBootstrapWorkspaceId = ref("");
+const providerBootstrapAgentId = ref("");
+const providerBootstrapOverwrite = ref(false);
 
 const themes = [
   { value: "ember", label: "ember", color: "#d4520a" },
@@ -233,6 +518,34 @@ const laneModes = [
   { value: "expanded", label: "expanded" },
   { value: "collapsed", label: "collapsed" },
 ] as const;
+
+const defaultProviderCommands = [
+  { providerId: "codex", command: "codex" },
+  { providerId: "claude", command: "claude" },
+  { providerId: "gemini", command: "gemini" },
+  { providerId: "kimi", command: "kimi" },
+];
+
+const defaultPersonaPresets = [
+  {
+    id: "implementer",
+    name: "implementer",
+    description: "prefer shipping code, tests, and a concise result summary.",
+    prompt: "you are the implementation persona. prefer concrete code changes over discussion. finish with changed files, checks, and blockers.",
+  },
+  {
+    id: "reviewer",
+    name: "reviewer",
+    description: "prioritize bugs, regressions, missing tests, and trust boundaries.",
+    prompt: "you are the review persona. prioritize findings, regressions, missing tests, trust boundaries, and operational risk over summaries.",
+  },
+  {
+    id: "architect",
+    name: "architect",
+    description: "plan with clear tradeoffs, rollout phases, and failure modes.",
+    prompt: "you are the architecture persona. respond with a concrete plan, tradeoffs, rollout order, and critical failure modes before implementation details.",
+  },
+];
 
 const pmApiUrl = computed(() => draft.pmToolUrl.trim().replace(/\/+$/, ""));
 const pmDocsUrl = computed(() => {
@@ -277,17 +590,255 @@ function applyTheme(t: string) {
   configStore.setTheme(t);
 }
 
-const draft = reactive<AppConfig>({ ...configStore.config });
+function mergeProviderCommands(commands: AppConfig["providerCommands"] | undefined) {
+  const byProvider = new Map(
+    (commands ?? [])
+      .filter((entry) => entry.providerId?.trim() && entry.command?.trim())
+      .map((entry) => [entry.providerId.trim().toLowerCase(), entry.command.trim()]),
+  );
+
+  const merged = defaultProviderCommands.map((entry) => ({
+    providerId: entry.providerId,
+    command: byProvider.get(entry.providerId) ?? entry.command,
+  }));
+
+  for (const [providerId, command] of byProvider.entries()) {
+    if (!merged.some((entry) => entry.providerId === providerId)) {
+      merged.push({ providerId, command });
+    }
+  }
+
+  return merged;
+}
+
+function mergePersonaPresets(personas: AppConfig["personaPresets"] | undefined) {
+  const normalized = (personas ?? [])
+    .filter((persona) => persona.name?.trim() && persona.prompt?.trim())
+    .map((persona) => ({
+      id: persona.id?.trim() || crypto.randomUUID(),
+      name: persona.name.trim(),
+      description: persona.description?.trim() ?? "",
+      prompt: persona.prompt.trim(),
+    }));
+
+  return normalized.length > 0
+    ? normalized
+    : defaultPersonaPresets.map((persona) => ({ ...persona }));
+}
+
+function providerLabel(providerId: string) {
+  switch (providerId) {
+    case "codex":
+      return "OpenAI Codex";
+    case "claude":
+      return "Claude Code";
+    case "gemini":
+      return "Gemini CLI";
+    case "kimi":
+      return "Kimi";
+    default:
+      return providerId;
+  }
+}
+
+function providerDocs(providerId: string) {
+  switch (providerId) {
+    case "codex":
+      return "https://openai.com/index/unlocking-the-codex-harness/";
+    case "claude":
+      return "https://docs.anthropic.com/en/docs/claude-code/cli-reference";
+    case "gemini":
+      return "https://github.com/google-gemini/gemini-cli";
+    case "kimi":
+      return "https://platform.moonshot.ai/docs/guide/agent-support";
+    default:
+      return "https://github.com";
+  }
+}
+
+function providerTemplate(providerId: string) {
+  switch (providerId) {
+    case "codex":
+      return "templates/AGENTS.codex.md";
+    case "claude":
+      return "templates/CLAUDE.md";
+    case "gemini":
+      return "templates/GEMINI.md";
+    default:
+      return "templates/worker.env.example";
+  }
+}
+
+const agentSetupGuideUrl =
+  "https://github.com/AstroGolem224/UMBRA/blob/main/docs/agent-setup-guide-2026-03-25.md";
+const workspaceOptions = computed(() =>
+  (draft.workspacePresets ?? []).filter((workspace) => workspace.name.trim() && workspace.rootPath.trim()),
+);
+const bootstrapAgents = computed(() =>
+  agentStore.agents.filter((agent) => ["online", "idle", "working"].includes(agent.status)),
+);
+
+const draft = reactive<AppConfig>({
+  ...configStore.config,
+  workspaceGrantRoots: [...(configStore.config.workspaceGrantRoots ?? [])],
+  personaPresets: mergePersonaPresets(configStore.config.personaPresets),
+  providerCommands: mergeProviderCommands(configStore.config.providerCommands),
+});
 
 watch(
   () => configStore.config,
-  (c) => Object.assign(draft, c),
+  (c) =>
+    Object.assign(draft, {
+      ...c,
+      workspaceGrantRoots: [...(c.workspaceGrantRoots ?? [])],
+      personaPresets: mergePersonaPresets(c.personaPresets),
+      providerCommands: mergeProviderCommands(c.providerCommands),
+    }),
   { deep: true }
 );
+
+async function toggleAutostart() {
+  try {
+    if (autostart.value) {
+      await invoke("plugin:autostart|enable");
+    } else {
+      await invoke("plugin:autostart|disable");
+    }
+  } catch {
+    // Autostart plugin not available in browser mode
+  }
+}
+
+onMounted(async () => {
+  if (!agentStore.agents.length) {
+    await agentStore.loadAgents();
+  }
+  ensureBootstrapSelections();
+  await refreshAllProviderChecklists();
+  try {
+    autostart.value = await invoke<boolean>("plugin:autostart|is_enabled");
+  } catch {
+    // Not available in browser mode
+  }
+});
 
 function addLaunchTarget() {
   if (!draft.launchTargets) draft.launchTargets = [];
   draft.launchTargets.push({ id: crypto.randomUUID(), name: "", path: "", icon: "LN" });
+}
+
+function addWorkspacePreset() {
+  draft.workspacePresets.push({
+    id: crypto.randomUUID(),
+    name: "",
+    rootPath: "",
+    writable: true,
+    allowedProviders: [],
+    allowedAgents: [],
+  });
+}
+
+function addPersonaPreset() {
+  draft.personaPresets.push({
+    id: crypto.randomUUID(),
+    name: "",
+    description: "",
+    prompt: "",
+  });
+}
+
+function addWorkspaceGrantRoot() {
+  draft.workspaceGrantRoots = [...(draft.workspaceGrantRoots ?? []), ""];
+}
+
+function seedWorkspaceGrantRoots() {
+  draft.workspaceGrantRoots = mergeWorkspaceGrantRoots(
+    draft.workspaceGrantRoots,
+    draft.workspacePresets,
+  );
+}
+
+function workspaceProvidersValue(workspace: WorkspacePreset) {
+  return (workspace.allowedProviders ?? []).join(", ");
+}
+
+function setWorkspaceProviders(workspace: WorkspacePreset, value: string) {
+  workspace.allowedProviders = parseCsvList(value);
+}
+
+function workspaceAgentsValue(workspace: WorkspacePreset) {
+  return (workspace.allowedAgents ?? []).join(", ");
+}
+
+function setWorkspaceAgents(workspace: WorkspacePreset, value: string) {
+  workspace.allowedAgents = parseCsvList(value);
+}
+
+function parseCsvList(value: string) {
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+
+function mergeWorkspacePresets(presets: AppConfig["workspacePresets"] | undefined) {
+  return (presets ?? [])
+    .filter((preset) => preset.name?.trim() || preset.rootPath?.trim())
+    .map((preset) => ({
+      id: preset.id?.trim() || crypto.randomUUID(),
+      name: preset.name.trim(),
+      rootPath: preset.rootPath.trim(),
+      writable: preset.writable !== false,
+      allowedProviders: [...new Set((preset.allowedProviders ?? []).map((entry) => entry.trim()).filter(Boolean))],
+      allowedAgents: [...new Set((preset.allowedAgents ?? []).map((entry) => entry.trim()).filter(Boolean))],
+    }))
+    .filter((preset) => preset.name && preset.rootPath);
+}
+
+function mergeWorkspaceGrantRoots(
+  roots: string[] | undefined,
+  presets: AppConfig["workspacePresets"] | undefined,
+) {
+  const next = new Set<string>();
+  for (const root of roots ?? []) {
+    if (root.trim()) next.add(root.trim());
+  }
+  for (const preset of presets ?? []) {
+    if (preset.rootPath?.trim()) next.add(preset.rootPath.trim());
+  }
+  return [...next].sort((left, right) => left.localeCompare(right));
+}
+
+function ensureBootstrapSelections() {
+  if (!providerBootstrapWorkspaceId.value && workspaceOptions.value.length > 0) {
+    providerBootstrapWorkspaceId.value =
+      draft.defaultWorkspaceId || workspaceOptions.value[0].id;
+  }
+  if (!providerBootstrapAgentId.value && bootstrapAgents.value.length > 0) {
+    providerBootstrapAgentId.value = bootstrapAgents.value[0].id;
+  }
+}
+
+async function pickWorkspaceRoot(index: number) {
+  const selection = await open({
+    directory: true,
+    multiple: false,
+    title: "select workspace root",
+  });
+  if (typeof selection === "string") {
+    draft.workspacePresets[index].rootPath = selection;
+  }
+}
+
+async function pickGrantRoot(index: number) {
+  const selection = await open({
+    directory: true,
+    multiple: false,
+    title: "select workspace grant root",
+  });
+  if (typeof selection === "string") {
+    draft.workspaceGrantRoots[index] = selection;
+  }
 }
 
 function lanePrefValue(kind: (typeof laneOptions)[number]["kind"]) {
@@ -313,6 +864,165 @@ async function openExternal(url: string) {
     await shellOpen(url);
   } catch {
     window.open(url, "_blank");
+  }
+}
+
+async function probeProvider(providerId: string) {
+  probingProviders.value = { ...probingProviders.value, [providerId]: true };
+  try {
+    providerProbeResults.value = {
+      ...providerProbeResults.value,
+      [providerId]: await invoke<ProviderProbeResult>("probe_provider_command", { providerId }),
+    };
+  } catch (error) {
+    providerProbeResults.value = {
+      ...providerProbeResults.value,
+      [providerId]: {
+        providerId,
+        command: "",
+        launchable: false,
+        summary: `probe failed: ${String(error)}`,
+      },
+    };
+  } finally {
+    probingProviders.value = { ...probingProviders.value, [providerId]: false };
+  }
+}
+
+function requireBootstrapTarget(providerId: string) {
+  ensureBootstrapSelections();
+  if (!providerBootstrapWorkspaceId.value) {
+    providerActionResults.value = {
+      ...providerActionResults.value,
+      [providerId]: "select a bootstrap workspace first",
+    };
+    return null;
+  }
+  return {
+    workspaceId: providerBootstrapWorkspaceId.value,
+    agentId: providerBootstrapAgentId.value || undefined,
+  };
+}
+
+async function checkProviderAuth(providerId: string) {
+  providerActionBusy.value = { ...providerActionBusy.value, [providerId]: true };
+  try {
+    const result = await invoke<ProviderAuthState>("get_provider_auth_state", { providerId });
+    providerActionResults.value = {
+      ...providerActionResults.value,
+      [providerId]: result.summary,
+    };
+  } catch (error) {
+    providerActionResults.value = {
+      ...providerActionResults.value,
+      [providerId]: `auth check failed: ${String(error)}`,
+    };
+  } finally {
+    providerActionBusy.value = { ...providerActionBusy.value, [providerId]: false };
+  }
+}
+
+async function refreshProviderChecklist(providerId: string) {
+  const target = requireBootstrapTarget(providerId);
+  if (!target) return;
+  providerActionBusy.value = { ...providerActionBusy.value, [providerId]: true };
+  try {
+    const result = await invoke<ProviderSetupChecklistResult>("check_provider_setup", {
+      providerId,
+      workspaceId: target.workspaceId,
+    });
+    providerChecklists.value = {
+      ...providerChecklists.value,
+      [providerId]: result,
+    };
+    providerActionResults.value = {
+      ...providerActionResults.value,
+      [providerId]: result.summary,
+    };
+  } catch (error) {
+    providerActionResults.value = {
+      ...providerActionResults.value,
+      [providerId]: `checklist failed: ${String(error)}`,
+    };
+  } finally {
+    providerActionBusy.value = { ...providerActionBusy.value, [providerId]: false };
+  }
+}
+
+async function refreshAllProviderChecklists() {
+  if (!providerBootstrapWorkspaceId.value) return;
+  for (const provider of draft.providerCommands) {
+    await refreshProviderChecklist(provider.providerId);
+  }
+}
+
+async function smokeTestProvider(providerId: string) {
+  const target = requireBootstrapTarget(providerId);
+  if (!target) return;
+  providerActionBusy.value = { ...providerActionBusy.value, [providerId]: true };
+  try {
+    const result = await invoke<ProviderProbeResult>("smoke_test_provider_command", {
+      providerId,
+      workspaceId: target.workspaceId,
+    });
+    providerActionResults.value = {
+      ...providerActionResults.value,
+      [providerId]: result.summary,
+    };
+  } catch (error) {
+    providerActionResults.value = {
+      ...providerActionResults.value,
+      [providerId]: `smoke test failed: ${String(error)}`,
+    };
+  } finally {
+    providerActionBusy.value = { ...providerActionBusy.value, [providerId]: false };
+  }
+}
+
+async function writeProviderBootstrap(providerId: string) {
+  const target = requireBootstrapTarget(providerId);
+  if (!target) return;
+  providerActionBusy.value = { ...providerActionBusy.value, [providerId]: true };
+  try {
+    const result = await invoke<WorkspaceBootstrapResult>("bootstrap_provider_workspace", {
+      providerId,
+      workspaceId: target.workspaceId,
+      agentId: target.agentId,
+      overwrite: providerBootstrapOverwrite.value,
+    });
+    providerActionResults.value = {
+      ...providerActionResults.value,
+      [providerId]: `${result.summary}: ${result.files.join(", ")}`,
+    };
+    await refreshProviderChecklist(providerId);
+  } catch (error) {
+    providerActionResults.value = {
+      ...providerActionResults.value,
+      [providerId]: `bootstrap failed: ${String(error)}`,
+    };
+  } finally {
+    providerActionBusy.value = { ...providerActionBusy.value, [providerId]: false };
+  }
+}
+
+async function copyProviderEnv(providerId: string) {
+  const target = requireBootstrapTarget(providerId);
+  if (!target) return;
+  try {
+    const content = await invoke<string>("get_provider_env_template", {
+      providerId,
+      agentId: target.agentId,
+    });
+    await navigator.clipboard.writeText(content);
+    providerActionResults.value = {
+      ...providerActionResults.value,
+      [providerId]: "worker env copied to clipboard",
+    };
+  } catch (error) {
+    providerActionResults.value = {
+      ...providerActionResults.value,
+      [providerId]: `copy env failed: ${String(error)}`,
+    };
   }
 }
 
@@ -350,13 +1060,26 @@ async function save() {
   saving.value = true;
   saved.value = false;
   try {
-    await configStore.saveConfig(draft);
+    await configStore.saveConfig({
+      ...draft,
+      workspacePresets: mergeWorkspacePresets(draft.workspacePresets),
+      workspaceGrantRoots: mergeWorkspaceGrantRoots(
+        draft.workspaceGrantRoots,
+        draft.workspacePresets,
+      ),
+      personaPresets: mergePersonaPresets(draft.personaPresets),
+      providerCommands: mergeProviderCommands(draft.providerCommands),
+    });
     saved.value = true;
     setTimeout(() => (saved.value = false), 2000);
   } finally {
     saving.value = false;
   }
 }
+
+watch([providerBootstrapWorkspaceId, providerBootstrapAgentId], () => {
+  void refreshAllProviderChecklists();
+});
 </script>
 
 <style scoped>
@@ -438,11 +1161,108 @@ async function save() {
   resize: vertical;
 }
 
-.launch-row {
+.launch-row,
+.provider-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.workspace-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--glass-border) 80%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 88%, transparent);
+}
+
+.workspace-row__head,
+.workspace-actions,
+.grant-row,
+.provider-bootstrap-grid,
+.workspace-grid {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
+}
+
+.provider-bootstrap-grid,
+.workspace-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 10px;
+}
+
+.workspace-name {
+  flex: 1;
+}
+
+.grant-row {
   margin-bottom: 8px;
+}
+
+.grant-row .glass-input {
+  flex: 1;
+}
+
+.persona-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 12px;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--glass-border) 80%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 88%, transparent);
+}
+
+.persona-row__head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.persona-name {
+  flex: 1;
+}
+
+.persona-prompt {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.provider-copy {
+  width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.provider-name {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.provider-hint {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.provider-template,
+.provider-result {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .launch-name {
@@ -451,6 +1271,47 @@ async function save() {
 
 .launch-path {
   flex: 1;
+}
+
+.provider-command {
+  flex: 1;
+}
+
+.provider-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.provider-overwrite-row {
+  margin-bottom: 12px;
+}
+
+.provider-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.checklist-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: var(--radius-lg);
+  border: 1px solid color-mix(in srgb, var(--glass-border) 82%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 92%, transparent);
+}
+
+.checklist-item.ready {
+  border-color: color-mix(in srgb, var(--accent-success) 32%, transparent);
+}
+
+.checklist-item.missing {
+  border-color: color-mix(in srgb, var(--accent-warning) 28%, transparent);
 }
 
 .form-actions,
@@ -509,11 +1370,11 @@ async function save() {
   justify-content: center;
   padding: 7px 12px;
   border-radius: var(--radius-pill);
-  border: 1px solid color-mix(in srgb, var(--glass-border) 88%, transparent);
-  background: color-mix(in srgb, var(--glass-bg) 80%, transparent);
+  border: none;
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
   color: var(--text-secondary);
   cursor: pointer;
-  transition: border-color 0.16s ease, color 0.16s ease, background 0.16s ease;
+  transition: color 0.16s ease, background 0.16s ease;
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.08em;
@@ -522,8 +1383,7 @@ async function save() {
 
 .lane-mode:hover,
 .lane-mode.active {
-  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-surface));
   color: var(--accent);
 }
 
@@ -537,6 +1397,10 @@ async function save() {
   gap: 10px;
   color: var(--text-secondary);
   font-size: 13px;
+}
+
+.checkbox-row.compact {
+  gap: 6px;
 }
 
 .checkbox-row input {
@@ -557,17 +1421,16 @@ async function save() {
   gap: 8px;
   padding: 7px 12px;
   border-radius: var(--radius-pill);
-  border: 1px solid color-mix(in srgb, var(--glass-border) 88%, transparent);
-  background: color-mix(in srgb, var(--glass-bg) 80%, transparent);
+  border: none;
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
   color: var(--text-secondary);
   cursor: pointer;
-  transition: border-color 0.16s ease, color 0.16s ease, background 0.16s ease;
+  transition: color 0.16s ease, background 0.16s ease;
 }
 
 .theme-swatch:hover,
 .theme-swatch.active {
-  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-surface));
   color: var(--accent);
 }
 
@@ -596,14 +1459,97 @@ async function save() {
   background: rgba(240, 249, 255, 0.96);
 }
 
+.token-table {
+  display: flex;
+  flex-direction: column;
+}
+
+.token-row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid color-mix(in srgb, var(--glass-border) 62%, transparent);
+}
+
+.token-row--head {
+  padding-top: 0;
+  border-top: 0;
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.token-agent {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.token-value-cell {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.token-input {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 6px 10px;
+  letter-spacing: 0.04em;
+  user-select: all;
+}
+
+.token-actions-cell {
+  display: flex;
+  gap: 6px;
+}
+
+.token-action {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 4px 8px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--glass-border) 88%, transparent);
+  background: color-mix(in srgb, var(--glass-bg) 78%, transparent);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.token-action:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.token-action--danger:hover {
+  border-color: var(--accent-error);
+  color: var(--accent-error);
+}
+
 @media (max-width: 760px) {
   .field-row {
     grid-template-columns: 1fr;
   }
 
-  .launch-row {
+  .launch-row,
+  .provider-row,
+  .persona-row__head,
+  .workspace-row__head {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .provider-bootstrap-grid,
+  .workspace-grid {
+    grid-template-columns: 1fr;
   }
 
   .lane-pref-row {
@@ -613,6 +1559,10 @@ async function save() {
 
   .launch-name {
     width: 100%;
+  }
+
+  .token-row {
+    grid-template-columns: 1fr;
   }
 }
 </style>

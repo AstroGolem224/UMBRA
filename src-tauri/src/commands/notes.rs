@@ -9,8 +9,6 @@ use uuid::Uuid;
 use crate::errors::{AppError, Result};
 use crate::state::AppState;
 
-const VALID_CATEGORIES: &[&str] = &["prompts", "cli", "agents", "skills", "misc"];
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Note {
@@ -24,19 +22,205 @@ pub struct Note {
     pub file_path: String,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedNoteAttachment {
+    pub file_name: String,
+    pub absolute_path: String,
+    pub relative_path: String,
+    pub markdown: String,
+    pub is_image: bool,
+}
+
 fn notes_base_dir(vault: &str, subdir: &str) -> PathBuf {
     PathBuf::from(vault).join(subdir)
 }
 
+fn note_attachments_dir(vault: &str, subdir: &str, note_id: &str) -> PathBuf {
+    notes_base_dir(vault, subdir)
+        .join("_attachments")
+        .join(note_id)
+}
+
+fn sanitize_category(category: &str) -> Result<String> {
+    let trimmed = category.trim();
+    if trimmed.is_empty() {
+        return Err(AppError::PathTraversal("Category cannot be empty".into()));
+    }
+
+    if matches!(trimmed, "." | "..") {
+        return Err(AppError::PathTraversal(format!(
+            "Invalid category: {category}"
+        )));
+    }
+
+    if trimmed.ends_with(' ') || trimmed.ends_with('.') {
+        return Err(AppError::PathTraversal(format!(
+            "Invalid category: {category}"
+        )));
+    }
+
+    if trimmed.chars().any(|ch| {
+        ch.is_control() || matches!(ch, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*')
+    }) {
+        return Err(AppError::PathTraversal(format!(
+            "Invalid category: {category}"
+        )));
+    }
+
+    let uppercase = trimmed.to_ascii_uppercase();
+    let reserved = [
+        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
+        "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    ];
+    if reserved.contains(&uppercase.as_str()) {
+        return Err(AppError::PathTraversal(format!(
+            "Invalid category: {category}"
+        )));
+    }
+
+    Ok(trimmed.to_string())
+}
+
+fn sanitize_note_id(note_id: &str) -> Result<String> {
+    let trimmed = note_id.trim();
+    if trimmed.is_empty() {
+        return Err(AppError::PathTraversal("Note id cannot be empty".into()));
+    }
+
+    if trimmed.contains("..")
+        || trimmed.contains('/')
+        || trimmed.contains('\\')
+        || trimmed
+            .chars()
+            .any(|ch| ch.is_control() || matches!(ch, '<' | '>' | ':' | '"' | '|' | '?' | '*'))
+    {
+        return Err(AppError::PathTraversal(format!(
+            "Invalid note id: {note_id}"
+        )));
+    }
+
+    Ok(trimmed.to_string())
+}
+
+fn extension_from_mime(mime_type: Option<&str>) -> Option<&'static str> {
+    match mime_type {
+        Some("image/png") => Some("png"),
+        Some("image/jpeg") => Some("jpg"),
+        Some("image/webp") => Some("webp"),
+        Some("image/gif") => Some("gif"),
+        Some("image/svg+xml") => Some("svg"),
+        Some("application/pdf") => Some("pdf"),
+        Some("text/plain") => Some("txt"),
+        _ => None,
+    }
+}
+
+fn sanitize_attachment_name(file_name: &str, mime_type: Option<&str>) -> String {
+    let raw_name = Path::new(file_name)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("")
+        .trim();
+
+    let (raw_stem, raw_ext) = raw_name
+        .rsplit_once('.')
+        .map(|(stem, ext)| (stem, Some(ext)))
+        .unwrap_or((raw_name, None));
+
+    let stem = raw_stem
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() {
+                ch.to_ascii_lowercase()
+            } else if matches!(ch, '-' | '_') {
+                ch
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string();
+
+    let ext = raw_ext
+        .filter(|value| !value.trim().is_empty())
+        .map(|value| {
+            value
+                .chars()
+                .filter(|ch| ch.is_ascii_alphanumeric())
+                .collect::<String>()
+                .to_ascii_lowercase()
+        })
+        .filter(|value| !value.is_empty())
+        .or_else(|| extension_from_mime(mime_type).map(ToString::to_string))
+        .unwrap_or_else(|| "bin".to_string());
+
+    let safe_stem = if stem.is_empty() {
+        format!("attachment-{}", Utc::now().format("%Y%m%d-%H%M%S"))
+    } else {
+        stem
+    };
+
+    format!("{safe_stem}.{ext}")
+}
+
+async fn ensure_unique_attachment_name(dir: &Path, file_name: &str) -> Result<String> {
+    if !fs::try_exists(dir.join(file_name)).await? {
+        return Ok(file_name.to_string());
+    }
+
+    let path = Path::new(file_name);
+    let stem = path
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("attachment");
+    let ext = path
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("bin");
+
+    for suffix in 2..10_000 {
+        let candidate = format!("{stem}-{suffix}.{ext}");
+        if !fs::try_exists(dir.join(&candidate)).await? {
+            return Ok(candidate);
+        }
+    }
+
+    Err(AppError::Other(
+        "Could not allocate a unique attachment name".into(),
+    ))
+}
+
+fn is_image_attachment(file_name: &str, mime_type: Option<&str>) -> bool {
+    mime_type.is_some_and(|value| value.starts_with("image/"))
+        || matches!(
+            Path::new(file_name)
+                .extension()
+                .and_then(|value| value.to_str())
+                .map(|value| value.to_ascii_lowercase())
+                .as_deref(),
+            Some("png" | "jpg" | "jpeg" | "gif" | "webp" | "svg")
+        )
+}
+
 /// Resolve a safe path within the vault. Rejects any path traversal attempts.
 fn resolve_note_path(vault: &str, subdir: &str, category: &str, filename: &str) -> Result<PathBuf> {
-    if !VALID_CATEGORIES.contains(&category) {
-        return Err(AppError::PathTraversal(format!("Invalid category: {category}")));
+    let safe_category = sanitize_category(category)?;
+    if filename.contains("..")
+        || filename.contains('/')
+        || filename.contains('\\')
+        || filename
+            .chars()
+            .any(|ch| matches!(ch, '<' | '>' | ':' | '"' | '|' | '?' | '*'))
+    {
+        return Err(AppError::PathTraversal(format!(
+            "Invalid filename: {filename}"
+        )));
     }
-    if filename.contains("..") || filename.contains('/') || filename.contains('\\') {
-        return Err(AppError::PathTraversal(format!("Invalid filename: {filename}")));
-    }
-    Ok(notes_base_dir(vault, subdir).join(category).join(filename))
+    Ok(notes_base_dir(vault, subdir)
+        .join(safe_category)
+        .join(filename))
 }
 
 fn parse_frontmatter(content: &str) -> (HashMap<String, String>, Vec<String>, String) {
@@ -181,18 +365,40 @@ pub async fn list_notes(state: State<'_, AppState>) -> std::result::Result<Vec<N
     drop(cfg);
 
     let mut notes = Vec::new();
+    let Ok(mut categories) = fs::read_dir(&base).await else {
+        return Ok(notes);
+    };
 
-    for category in VALID_CATEGORIES {
-        let cat_dir = base.join(category);
-        let Ok(mut entries) = fs::read_dir(&cat_dir).await else { continue };
+    while let Ok(Some(category_entry)) = categories.next_entry().await {
+        let Ok(file_type) = category_entry.file_type().await else {
+            continue;
+        };
+        if !file_type.is_dir() {
+            continue;
+        }
+
+        let dir_name = category_entry.file_name().to_string_lossy().to_string();
+        let Ok(category) = sanitize_category(&dir_name) else {
+            continue;
+        };
+
+        let Ok(mut entries) = fs::read_dir(category_entry.path()).await else {
+            continue;
+        };
         while let Ok(Some(entry)) = entries.next_entry().await {
             let path = entry.path();
             if path.extension().and_then(|e| e.to_str()) != Some("md") {
                 continue;
             }
 
-            let Ok(raw_content) = fs::read_to_string(&path).await else { continue };
-            let filename = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
+            let Ok(raw_content) = fs::read_to_string(&path).await else {
+                continue;
+            };
+            let filename = path
+                .file_stem()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
             let meta = fs::metadata(&path).await.ok();
             let fallback_updated_at = meta
                 .and_then(|m| m.modified().ok())
@@ -210,12 +416,6 @@ pub async fn list_notes(state: State<'_, AppState>) -> std::result::Result<Vec<N
                 .cloned()
                 .unwrap_or_else(|| filename.clone());
             let (body_title, cleaned_body) = split_title_from_body(&body, &fallback_title);
-
-            let category = frontmatter
-                .get("category")
-                .cloned()
-                .filter(|value| VALID_CATEGORIES.contains(&value.as_str()))
-                .unwrap_or_else(|| category.to_string());
             let title = frontmatter
                 .get("title")
                 .cloned()
@@ -234,7 +434,7 @@ pub async fn list_notes(state: State<'_, AppState>) -> std::result::Result<Vec<N
                 id: filename,
                 title,
                 content: cleaned_body,
-                category,
+                category: category.clone(),
                 tags,
                 created_at,
                 updated_at,
@@ -248,7 +448,10 @@ pub async fn list_notes(state: State<'_, AppState>) -> std::result::Result<Vec<N
 }
 
 #[tauri::command]
-pub async fn save_note(note: Note, state: State<'_, AppState>) -> std::result::Result<Note, AppError> {
+pub async fn save_note(
+    note: Note,
+    state: State<'_, AppState>,
+) -> std::result::Result<Note, AppError> {
     let cfg = state.config.read().await;
     let vault = cfg.vault_path.clone();
     let subdir = cfg.notes_subdir.clone();
@@ -297,7 +500,11 @@ pub async fn save_note(note: Note, state: State<'_, AppState>) -> std::result::R
 }
 
 #[tauri::command]
-pub async fn delete_note(id: String, category: String, state: State<'_, AppState>) -> std::result::Result<(), AppError> {
+pub async fn delete_note(
+    id: String,
+    category: String,
+    state: State<'_, AppState>,
+) -> std::result::Result<(), AppError> {
     let cfg = state.config.read().await;
     let vault = cfg.vault_path.clone();
     let subdir = cfg.notes_subdir.clone();
@@ -313,6 +520,56 @@ pub async fn delete_note(id: String, category: String, state: State<'_, AppState
     Ok(())
 }
 
+#[tauri::command]
+pub async fn save_note_attachment(
+    note_id: String,
+    category: String,
+    file_name: String,
+    bytes: Vec<u8>,
+    mime_type: Option<String>,
+    state: State<'_, AppState>,
+) -> std::result::Result<SavedNoteAttachment, AppError> {
+    if bytes.is_empty() {
+        return Err(AppError::Other("Attachment payload was empty".into()));
+    }
+
+    let note_id = sanitize_note_id(&note_id)?;
+    let _category = sanitize_category(&category)?;
+
+    let cfg = state.config.read().await;
+    let vault = cfg.vault_path.clone();
+    let subdir = cfg.notes_subdir.clone();
+    drop(cfg);
+
+    let dir = note_attachments_dir(&vault, &subdir, &note_id);
+    fs::create_dir_all(&dir).await?;
+
+    let sanitized_name = sanitize_attachment_name(&file_name, mime_type.as_deref());
+    let unique_name = ensure_unique_attachment_name(&dir, &sanitized_name).await?;
+    let absolute_path = dir.join(&unique_name);
+    fs::write(&absolute_path, bytes).await?;
+
+    let relative_path = format!("../_attachments/{note_id}/{unique_name}");
+    let is_image = is_image_attachment(&unique_name, mime_type.as_deref());
+    let label = Path::new(&unique_name)
+        .file_stem()
+        .and_then(|value| value.to_str())
+        .unwrap_or("attachment");
+    let markdown = if is_image {
+        format!("![{label}]({relative_path})")
+    } else {
+        format!("[{unique_name}]({relative_path})")
+    };
+
+    Ok(SavedNoteAttachment {
+        file_name: unique_name,
+        absolute_path: absolute_path.to_string_lossy().to_string(),
+        relative_path,
+        markdown,
+        is_image,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -324,8 +581,20 @@ mod tests {
     }
 
     #[test]
+    fn custom_category_resolves_path() {
+        let result = resolve_note_path(r"D:\vault", "UMBRA_Notes", "boss fights", "my-note.md");
+        assert!(result.is_ok());
+    }
+
+    #[test]
     fn invalid_category_rejected() {
-        let result = resolve_note_path(r"D:\vault", "UMBRA_Notes", "../../etc", "passwd.md");
+        let result = resolve_note_path(r"D:\vault", "UMBRA_Notes", "boss/fights", "passwd.md");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn reserved_category_rejected() {
+        let result = resolve_note_path(r"D:\vault", "UMBRA_Notes", "CON", "passwd.md");
         assert!(result.is_err());
     }
 
@@ -343,7 +612,8 @@ mod tests {
 
     #[test]
     fn parses_frontmatter_and_tags() {
-        let raw = "---\ntitle: 'hello'\ncategory: 'skills'\ntags:\n  - 'rust'\n  - 'tauri'\n---\n\nbody";
+        let raw =
+            "---\ntitle: 'hello'\ncategory: 'skills'\ntags:\n  - 'rust'\n  - 'tauri'\n---\n\nbody";
         let (meta, tags, body) = parse_frontmatter(raw);
         assert_eq!(meta.get("title"), Some(&"hello".to_string()));
         assert_eq!(meta.get("category"), Some(&"skills".to_string()));
@@ -356,5 +626,20 @@ mod tests {
         let (title, body) = split_title_from_body("# Heading\n\ntext", "fallback");
         assert_eq!(title, "Heading");
         assert_eq!(body, "text");
+    }
+
+    #[test]
+    fn sanitizes_attachment_names() {
+        let result = sanitize_attachment_name(
+            r"C:\Users\matth\Desktop\Quarterly Report.png",
+            Some("image/png"),
+        );
+        assert_eq!(result, "quarterly-report.png");
+    }
+
+    #[test]
+    fn infers_attachment_extension_from_mime() {
+        let result = sanitize_attachment_name("", Some("image/png"));
+        assert!(result.ends_with(".png"));
     }
 }

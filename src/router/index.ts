@@ -11,6 +11,14 @@ export const router = createRouter({
       component: () => import("@/views/AgentsView.vue"),
     },
     {
+      path: "/workbench",
+      component: () => import("@/views/WorkbenchView.vue"),
+    },
+    {
+      path: "/ops-room",
+      component: () => import("@/views/OpsRoomView.vue"),
+    },
+    {
       path: "/notes",
       component: () => import("@/views/NotesView.vue"),
     },

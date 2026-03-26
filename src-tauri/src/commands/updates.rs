@@ -39,7 +39,9 @@ pub async fn check_for_updates(
     let current_version = app.package_info().version.to_string();
 
     if endpoints.is_empty() || public_key.is_empty() {
-        *pending_update.0.lock().unwrap() = None;
+        if let Ok(mut guard) = pending_update.0.lock() {
+            *guard = None;
+        }
         return Ok(UpdateCheckResult {
             configured: false,
             update_available: false,
@@ -66,7 +68,10 @@ pub async fn check_for_updates(
         version: update.as_ref().map(|item| item.version.clone()),
     };
 
-    *pending_update.0.lock().unwrap() = update;
+    match pending_update.0.lock() {
+        Ok(mut guard) => *guard = update,
+        Err(_) => return Err(AppError::Other("failed to acquire update lock".into())),
+    }
 
     Ok(result)
 }
@@ -75,7 +80,11 @@ pub async fn check_for_updates(
 pub async fn install_pending_update(
     pending_update: State<'_, PendingUpdate>,
 ) -> Result<bool, AppError> {
-    let Some(update) = pending_update.0.lock().unwrap().take() else {
+    let update = match pending_update.0.lock() {
+        Ok(mut guard) => guard.take(),
+        Err(_) => return Err(AppError::Other("failed to acquire update lock".into())),
+    };
+    let Some(update) = update else {
         return Ok(false);
     };
 
@@ -97,8 +106,14 @@ mod tests {
             collect_endpoints("https://a.example/latest.json\n\n https://b.example/latest.json ")
                 .unwrap();
         assert_eq!(endpoints.len(), 2);
-        assert_eq!(endpoints[0], Url::parse("https://a.example/latest.json").unwrap());
-        assert_eq!(endpoints[1], Url::parse("https://b.example/latest.json").unwrap());
+        assert_eq!(
+            endpoints[0],
+            Url::parse("https://a.example/latest.json").unwrap()
+        );
+        assert_eq!(
+            endpoints[1],
+            Url::parse("https://b.example/latest.json").unwrap()
+        );
     }
 
     #[test]

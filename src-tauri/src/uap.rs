@@ -5,7 +5,7 @@
 ///   POST /api/agents/:id/heartbeat  — agent registers / updates status
 ///   GET  /api/agents/:id/tasks      — agent polls for pending tasks
 ///
-/// Auth: X-Agent-Token header must match the configured token.
+/// Auth: X-Agent-Token header must match the configured token for the addressed agent id.
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 
@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::RwLock;
 
+use crate::commands::config::AppConfig;
 use crate::types::{Agent, AgentCronJob, AgentStatus, AgentTask};
 
 // ── Registry ────────────────────────────────────────────────────────────────
@@ -46,7 +47,7 @@ impl AgentRegistry {
 #[derive(Clone)]
 struct UapState {
     registry: AgentRegistry,
-    token: String,
+    config: Arc<RwLock<AppConfig>>,
     app_handle: AppHandle,
 }
 
@@ -110,16 +111,31 @@ struct CronJobSnapshot {
     command: Option<String>,
 }
 
-fn bool_true() -> bool { true }
-fn default_cron_status() -> String { "scheduled".into() }
+fn bool_true() -> bool {
+    true
+}
+fn default_cron_status() -> String {
+    "scheduled".into()
+}
 
 // ── Auth helper ──────────────────────────────────────────────────────────────
 
-fn check_token(headers: &HeaderMap, expected: &str) -> bool {
-    headers
+async fn check_token(headers: &HeaderMap, agent_id: &str, config: &Arc<RwLock<AppConfig>>) -> bool {
+    let provided = headers
         .get("x-agent-token")
         .and_then(|v| v.to_str().ok())
-        .map(|v| v == expected)
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+
+    let Some(provided) = provided else {
+        return false;
+    };
+
+    let config = config.read().await;
+    config
+        .agent_auth_tokens
+        .get(agent_id)
+        .map(|expected| expected == provided)
         .unwrap_or(false)
 }
 
@@ -131,7 +147,7 @@ async fn handle_heartbeat(
     headers: HeaderMap,
     Json(body): Json<HeartbeatBody>,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    if !check_token(&headers, &state.token) {
+    if !check_token(&headers, &agent_id, &state.config).await {
         return (
             StatusCode::UNAUTHORIZED,
             Json(serde_json::json!({"error": "invalid token"})),
@@ -170,7 +186,10 @@ async fn handle_heartbeat(
     };
 
     // Emit full agent record to frontend
-    let _ = state.app_handle.emit("agent-status-changed", &updated_agent);
+    let _ = state
+        .app_handle
+        .emit("agent-status-changed", &updated_agent);
+    let _ = crate::sync_tray_with_agent_registry(&state.app_handle, &state.registry).await;
 
     // Drain pending tasks for this agent
     let tasks: Vec<AgentTask> = {
@@ -183,7 +202,13 @@ async fn handle_heartbeat(
 
     (
         StatusCode::OK,
-        Json(serde_json::to_value(HeartbeatResponse { ok: true, pending_tasks: tasks }).unwrap()),
+        Json(
+            serde_json::to_value(HeartbeatResponse {
+                ok: true,
+                pending_tasks: tasks,
+            })
+            .unwrap(),
+        ),
     )
 }
 
@@ -192,7 +217,7 @@ async fn handle_get_tasks(
     State(state): State<UapState>,
     headers: HeaderMap,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    if !check_token(&headers, &state.token) {
+    if !check_token(&headers, &agent_id, &state.config).await {
         return (
             StatusCode::UNAUTHORIZED,
             Json(serde_json::json!({"error": "invalid token"})),
@@ -216,7 +241,7 @@ async fn handle_upsert_cron_jobs(
     headers: HeaderMap,
     Json(body): Json<CronJobsBody>,
 ) -> (StatusCode, Json<serde_json::Value>) {
-    if !check_token(&headers, &state.token) {
+    if !check_token(&headers, &agent_id, &state.config).await {
         return (
             StatusCode::UNAUTHORIZED,
             Json(serde_json::json!({"error": "invalid token"})),
@@ -273,7 +298,9 @@ fn materialize_cron_jobs(
 ) -> Vec<AgentCronJob> {
     jobs.into_iter()
         .map(|job| AgentCronJob {
-            id: job.id.unwrap_or_else(|| fallback_cron_job_id(agent_id, &job.job)),
+            id: job
+                .id
+                .unwrap_or_else(|| fallback_cron_job_id(agent_id, &job.job)),
             agent_id: agent_id.to_string(),
             agent_name: agent_name.to_string(),
             job: job.job,
@@ -333,10 +360,14 @@ pub async fn collect_all_cron_jobs(registry: &AgentRegistry) -> Vec<AgentCronJob
 pub async fn start_uap_server(
     app_handle: AppHandle,
     registry: AgentRegistry,
-    token: String,
+    config: Arc<RwLock<AppConfig>>,
     port: u16,
 ) {
-    let state = UapState { registry, token, app_handle };
+    let state = UapState {
+        registry,
+        config,
+        app_handle,
+    };
 
     let app = Router::new()
         .route("/api/agents/{id}/heartbeat", post(handle_heartbeat))

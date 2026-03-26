@@ -11,6 +11,9 @@ pub enum AppError {
     #[error("HTTP error: {0}")]
     Http(#[from] reqwest::Error),
 
+    #[error("SQLite error: {0}")]
+    Sqlite(#[from] rusqlite::Error),
+
     #[error("Path traversal denied: {0}")]
     PathTraversal(String),
 

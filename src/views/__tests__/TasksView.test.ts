@@ -24,8 +24,11 @@ vi.mock("@/stores/useConfigStore", () => ({
 import TasksView from "../TasksView.vue";
 
 describe("TasksView", () => {
+  let fetchTasks: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    fetchTasks = vi.fn().mockResolvedValue(undefined);
 
     const tasks: Task[] = [
       {
@@ -78,9 +81,9 @@ describe("TasksView", () => {
         loading: false,
         error: null,
         lastSync: "2026-03-20T10:00:00.000Z",
-        fetchTasks: vi.fn().mockResolvedValue(undefined),
+        fetchTasks,
         setupLiveUpdates: vi.fn().mockResolvedValue(undefined),
-      })
+      }),
     );
 
     mocks.useConfigStore.mockReturnValue(
@@ -89,7 +92,7 @@ describe("TasksView", () => {
           taskLanePrefs: {},
         },
         saveConfig: vi.fn().mockResolvedValue(undefined),
-      })
+      }),
     );
 
     mocks.invoke.mockImplementation(async (command: string) => {
@@ -98,8 +101,18 @@ describe("TasksView", () => {
       }
       if (command === "get_pm_columns") {
         return [
-          { id: "c-backlog", name: "Backlog", kind: "backlog", projectId: "p1" },
-          { id: "c-progress", name: "Doing", kind: "in_progress", projectId: "p1" },
+          {
+            id: "c-backlog",
+            name: "Backlog",
+            kind: "backlog",
+            projectId: "p1",
+          },
+          {
+            id: "c-progress",
+            name: "Doing",
+            kind: "in_progress",
+            projectId: "p1",
+          },
           { id: "c-review", name: "Review", kind: "review", projectId: "p1" },
           { id: "c-done", name: "Done", kind: "done", projectId: "p1" },
         ];
@@ -122,8 +135,12 @@ describe("TasksView", () => {
 
     expect(wrapper.text()).toContain("SORT BY PRIORITY");
 
-    const backlogCard = wrapper.findAll(".task-card").find((card) => card.text().includes("Backlog task"));
-    const doingCard = wrapper.findAll(".task-card").find((card) => card.text().includes("Doing task"));
+    const backlogCard = wrapper
+      .findAll(".task-card")
+      .find((card) => card.text().includes("Backlog task"));
+    const doingCard = wrapper
+      .findAll(".task-card")
+      .find((card) => card.text().includes("Doing task"));
 
     expect(backlogCard?.attributes("draggable")).toBe("true");
 
@@ -139,13 +156,17 @@ describe("TasksView", () => {
     await reviewLaneToggle!.trigger("click");
     await flushPromises();
 
-    const reviewCard = wrapper.findAll(".task-card").find((card) => card.text().includes("Review task"));
+    const reviewCard = wrapper
+      .findAll(".task-card")
+      .find((card) => card.text().includes("Review task"));
     expect(reviewCard).toBeTruthy();
 
     await doneLaneToggle!.trigger("click");
     await flushPromises();
 
-    const doneCard = wrapper.findAll(".task-card").find((card) => card.text().includes("Done task"));
+    const doneCard = wrapper
+      .findAll(".task-card")
+      .find((card) => card.text().includes("Done task"));
     expect(doneCard).toBeTruthy();
     expect(doneCard?.text()).not.toContain("Should start collapsed");
 
@@ -168,7 +189,9 @@ describe("TasksView", () => {
       taskIds: ["t-backlog", "t-doing"],
     });
 
-    const sortButton = wrapper.findAll("button").find((button) => button.text().includes("SORT BY PRIORITY"));
+    const sortButton = wrapper
+      .findAll("button")
+      .find((button) => button.text().includes("SORT BY PRIORITY"));
     expect(sortButton).toBeTruthy();
     await sortButton!.trigger("click");
     await flushPromises();
@@ -200,7 +223,7 @@ describe("TasksView", () => {
         lastSync: "2026-03-20T10:00:00.000Z",
         fetchTasks: vi.fn().mockResolvedValue(undefined),
         setupLiveUpdates: vi.fn().mockResolvedValue(undefined),
-      })
+      }),
     );
 
     mocks.useConfigStore.mockReturnValue(
@@ -209,7 +232,7 @@ describe("TasksView", () => {
           taskLanePrefs: {},
         },
         saveConfig,
-      })
+      }),
     );
 
     const wrapper = mount(TasksView, {
@@ -234,5 +257,43 @@ describe("TasksView", () => {
     expect(backlogLaneToggle?.text()).toBe("-");
     expect(wrapper.text()).toContain("Backlog 1");
     expect(saveConfig).toHaveBeenCalled();
+  });
+
+  it("refreshes tasks after posting a comment", async () => {
+    const wrapper = mount(TasksView, {
+      global: {
+        stubs: {
+          Teleport: true,
+          Transition: false,
+        },
+      },
+    });
+
+    await flushPromises();
+
+    const commentButton = wrapper
+      .findAll(".comment-btn")
+      .find((button) => button.text().includes("COMMENT"));
+    expect(commentButton).toBeTruthy();
+
+    await commentButton!.trigger("click");
+    await flushPromises();
+
+    const textarea = wrapper.find("textarea");
+    await textarea.setValue("ship it");
+
+    const postButton = wrapper
+      .findAll("button")
+      .find((button) => button.text().includes("POST"));
+    expect(postButton).toBeTruthy();
+
+    await postButton!.trigger("click");
+    await flushPromises();
+
+    expect(mocks.invoke).toHaveBeenCalledWith("add_pm_comment", {
+      taskId: "t-backlog",
+      content: "ship it",
+    });
+    expect(fetchTasks).toHaveBeenCalled();
   });
 });

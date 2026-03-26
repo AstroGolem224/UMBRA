@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__Claude_Preview__preview_start",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:1430/)",
+      "Bash(curl -s http://localhost:1430/)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill /PID 50108 /F)",
+      "Bash(cmd //c \"taskkill /PID 50108 /F\")",
+      "Bash(npm run:*)",
+      "Bash(grep -r list_skills C:/Users/matth/OneDrive/Dokumente/GitHub/UMBRA/src --include=*.ts --include=*.vue)",
+      "Bash(claude --version)",
+      "Bash(codex --version)",
+      "Bash(gemini --version)",
+      "Bash(cmd //c 'where /R C:\\\\Users\\\\matth\\\\AppData claude.exe')",
+      "Bash(npm install:*)",
+      "Bash(cmd //c \"claude --version\")",
+      "Bash(cmd //c \"kimi --help\")",
+      "Bash(cmd //c \"kimi chat --help\")",
+      "Bash(cmd //c \"kimi -h\")",
+      "Bash(cargo test:*)",
+      "Bash(npx vue-tsc:*)",
+      "Bash(npx vite:*)",
+      "Bash(curl -s http://localhost:1430/notes-api/list)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f''''{len\\(d\\)} notes loaded''''\\); [print\\(f''''  {n[id][:20]}... title={n[title][:30]} tags={n[tags]}''''\\) for n in d[:5]]\")",
+      "Bash(curl -s http://localhost:1430/pm-api/projects)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f''''{len\\(d\\)} projects''''\\); [print\\(f''''  {p[name]} \\(id={p[id][:8]}..., {len\\(p.get\\(columns,[]\\)\\)} cols\\)''''\\) for p in d]\")",
+      "Bash(curl -s http://localhost:1430/pm-api/projects/1566ae21-df64-4ad9-a7a3-1df11188cb21/tasks)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f''''{len\\(d\\)} UMBRA tasks''''\\); [print\\(f''''  [{t.get\\(priority,?\\)}] {t[title][:50]}''''\\) for t in d[:8]]\")",
+      "Bash(curl -s http://100.115.61.30:8000/api/projects/1566ae21-df64-4ad9-a7a3-1df11188cb21/tasks)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f''''{len\\(d\\)} tasks total''''\\)\")",
+      "Bash(curl -s http://100.115.61.30:8000/api/projects)",
+      "Bash(python3 -c \":*)",
+      "Bash(curl -s http://100.115.61.30:8000/api/projects/1566ae21-b08b-4641-86f4-c16e7064d5a7/tasks)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f''''{len\\(d\\)} tasks''''\\)\")",
+      "Bash(ls \"C:\\\\Users\\\\matth\\\\OneDrive\\\\Dokumente\\\\GitHub\\\\UMBRA\\\\.github\\\\workflows\"\" 2>/dev/null || echo \"No workflows directory \")"
+    ]
+  }
+}

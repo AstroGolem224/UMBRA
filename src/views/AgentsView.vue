@@ -39,11 +39,16 @@
         </div>
 
         <div class="telemetry-block">
-          <span class="block-label">agent token</span>
-          <code class="code-pill">{{ configStore.config.uapToken }}</code>
+          <span class="block-label">auth mode</span>
+          <code class="code-pill">per-agent token</code>
         </div>
 
-        <p class="telemetry-copy">timeout: 30 min / hook: <code>.claude/settings.local.json</code> -> PostToolUse</p>
+        <div class="telemetry-block">
+          <span class="block-label">selected token</span>
+          <code class="code-pill">{{ selectedAgentToken || "select an agent to inspect its token" }}</code>
+        </div>
+
+        <p class="telemetry-copy">timeout: 30 min / auth: <code>x-agent-token</code> must match the token provisioned for that exact agent id.</p>
       </aside>
     </section>
 
@@ -79,6 +84,11 @@
         <div class="detail-section">
           <span class="detail-label">last seen</span>
           <span class="detail-val">{{ new Date(selectedAgent.lastSeen).toLocaleString() }}</span>
+        </div>
+
+        <div class="detail-section">
+          <span class="detail-label">uap token</span>
+          <code class="code-pill">{{ selectedAgentToken || "no token provisioned" }}</code>
         </div>
 
         <div class="detail-section">
@@ -229,6 +239,9 @@ const deleting = ref(false);
 const onlineCount = computed(() =>
   agentStore.agents.filter((a) => ["online", "working", "idle"].includes(a.status)).length
 );
+const selectedAgentToken = computed(() =>
+  selectedAgent.value ? configStore.config.agentAuthTokens?.[selectedAgent.value.id] ?? "" : ""
+);
 const uapEndpoint = computed(
   () =>
     `http://${configStore.config.uapAdvertiseHost}:${configStore.config.uapPort}/api/agents/<id>/heartbeat`
@@ -262,6 +275,7 @@ async function submitAddAgent() {
       allowedTools: newAgent.toolsRaw.split(",").map((s) => s.trim()).filter(Boolean),
     };
     await agentStore.addAgent(cfg);
+    await configStore.load();
     closeAddModal();
   } catch (e) {
     addError.value = String(e);
@@ -275,6 +289,7 @@ async function deleteAgent() {
   deleting.value = true;
   try {
     await agentStore.removeAgent(selectedAgent.value.id);
+    await configStore.load();
     selectedAgent.value = null;
   } finally {
     deleting.value = false;
@@ -417,8 +432,8 @@ onMounted(async () => {
   align-items: center;
   padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--glass-border) 88%, transparent);
-  background: color-mix(in srgb, var(--glass-bg) 84%, transparent);
+  border: none;
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-surface));
   color: var(--text-secondary);
   font-family: var(--font-mono);
   font-size: 11px;

@@ -321,8 +321,8 @@ onMounted(async () => {
 .job-status {
   padding: 5px 9px;
   border-radius: var(--radius-pill);
-  border: 1px solid color-mix(in srgb, var(--glass-border) 88%, transparent);
-  background: color-mix(in srgb, var(--glass-bg) 82%, transparent);
+  border: none;
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
   color: var(--text-secondary);
   font-family: var(--font-mono);
   font-size: 11px;
@@ -330,13 +330,13 @@ onMounted(async () => {
 
 .status-pill.danger,
 .job-status.error {
-  color: var(--accent-error);
-  border-color: rgba(239, 68, 68, 0.32);
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.10);
 }
 
 .job-status.ok {
-  color: var(--accent-success);
-  border-color: rgba(34, 197, 94, 0.24);
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
 }
 
 .job-status.muted {
@@ -474,8 +474,7 @@ onMounted(async () => {
 :global([data-theme="light"]) .sync-pill,
 :global([data-theme="light"]) .status-pill,
 :global([data-theme="light"]) .job-status {
-  background: rgba(255, 255, 255, 0.88);
-  border-color: rgba(15, 23, 42, 0.08);
+  background: rgba(0, 101, 141, 0.06);
 }
 
 :global([data-theme="light"]) .job-card,

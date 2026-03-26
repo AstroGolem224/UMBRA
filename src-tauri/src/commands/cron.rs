@@ -99,11 +99,19 @@ pub async fn run_cron_job_now(
             .ok_or_else(|| AppError::Other(format!("cron job {id} not found")))?
     };
 
-    let output = TokioCommand::new("cmd")
-        .args(["/C", &cmd_str])
-        .output()
-        .await
-        .map_err(AppError::Io)?;
+    let output = if cfg!(target_os = "windows") {
+        TokioCommand::new("cmd")
+            .args(["/C", &cmd_str])
+            .output()
+            .await
+            .map_err(AppError::Io)?
+    } else {
+        TokioCommand::new("sh")
+            .args(["-c", &cmd_str])
+            .output()
+            .await
+            .map_err(AppError::Io)?
+    };
 
     let stdout = String::from_utf8_lossy(&output.stdout).to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).to_string();

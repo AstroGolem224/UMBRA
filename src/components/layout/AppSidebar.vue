@@ -1,15 +1,5 @@
 <template>
   <aside class="sidebar">
-    <div class="sidebar-brand">
-      <p class="brand-kicker">umbra control</p>
-      <div class="brand-line">
-        <span class="brand-emblem">u</span>
-      </div>
-      <div class="brand-copy">
-        <p class="brand-subline">desktop orchestrator</p>
-      </div>
-    </div>
-
     <nav class="nav-shell" aria-label="Primary">
       <ul class="nav-list">
         <li v-for="item in navItems" :key="item.path">
@@ -104,6 +94,19 @@ function iconPaths(icon: string) {
       "M12 5v10",
       "M8 9l4-4l4 4",
     ],
+    workbench: [
+      "M4 7h16",
+      "M4 12h10",
+      "M4 17h7",
+      "M17 11l3 3l-3 3",
+    ],
+    ops: [
+      "M5 6h14",
+      "M5 12h8",
+      "M5 18h10",
+      "M16 10l3 2l-3 2",
+      "M14 16l3 2l-3 2",
+    ],
     plugins: [
       "M10 4.5V9H5.5",
       "M18.5 10H14V5.5",
@@ -127,6 +130,8 @@ function iconPaths(icon: string) {
 const navItems = computed(() => [
   { path: "/dashboard", label: "Dashboard", icon: "dashboard" },
   { path: "/agents", label: "Agents", icon: "agents" },
+  { path: "/workbench", label: "Workbench", icon: "workbench" },
+  { path: "/ops-room", label: "Ops Room", icon: "ops" },
   {
     path: "/tasks",
     label: "Tasks",
@@ -156,85 +161,19 @@ const navItems = computed(() => [
   border-right: 1px solid color-mix(in srgb, var(--glass-border) 82%, transparent);
 }
 
-.sidebar-brand,
 .sidebar-footer {
   border: 1px solid color-mix(in srgb, var(--glass-border) 90%, transparent);
   border-radius: var(--radius-xl);
   background: color-mix(in srgb, var(--glass-bg) 94%, transparent);
 }
 
-.sidebar-brand {
-  min-height: var(--view-hero-min-height);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  padding: var(--view-hero-padding-y) 16px;
-  background:
-    radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 9%, transparent), transparent 38%),
-    linear-gradient(135deg, color-mix(in srgb, var(--bg-secondary) 93%, transparent), color-mix(in srgb, var(--bg-primary) 97%, transparent));
-}
-
-.brand-kicker,
 .footer-kicker,
 .status-label {
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-}
-
-.brand-kicker,
-.footer-kicker,
-.status-label {
   color: var(--text-muted);
-}
-
-.brand-line {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: auto;
-}
-
-.brand-emblem {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 70px;
-  height: 70px;
-  border-radius: var(--radius-lg);
-  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
-  color: var(--accent);
-  font-family: var(--font-display);
-  font-size: 48px;
-  font-weight: 700;
-  line-height: 1;
-  text-transform: uppercase;
-}
-
-.brand-copy {
-  text-align: center;
-}
-
-.brand-subline {
-  margin: 0;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 9px;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
-:global([data-theme="light"] .sidebar-brand) {
-  border-color: rgba(8, 145, 178, 0.14);
-  background:
-    radial-gradient(circle at top right, rgba(8, 145, 178, 0.12), transparent 34%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(236, 243, 248, 0.94));
-  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.06);
 }
 
 .nav-shell {
@@ -263,30 +202,37 @@ const navItems = computed(() => [
 
 .nav-item:hover {
   background: color-mix(in srgb, var(--accent) 6%, transparent);
-  border-color: color-mix(in srgb, var(--glass-border) 88%, transparent);
   transform: translateX(1px);
 }
 
 .nav-item.active {
-  background:
-    linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, transparent), transparent 72%),
-    color-mix(in srgb, var(--glass-bg) 96%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 26%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-surface));
+  border-color: transparent;
 }
 
 .nav-icon {
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  color: var(--text-muted);
+  transition: color 0.16s ease;
+}
+
+.nav-item:hover .nav-icon,
+.nav-item.active .nav-icon {
   color: var(--accent);
 }
 
+.nav-item.active .nav-icon {
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 40%, transparent));
+}
+
 .nav-icon svg {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   stroke: currentColor;
   stroke-width: 1.8;
   stroke-linecap: round;
@@ -295,21 +241,27 @@ const navItems = computed(() => [
 
 .nav-label {
   flex: 1 1 auto;
-  color: var(--text-primary);
+  color: var(--text-secondary);
   font-family: var(--font-display);
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   line-height: 0.96;
   letter-spacing: 0.03em;
+  transition: color 0.16s ease;
+}
+
+.nav-item:hover .nav-label,
+.nav-item.active .nav-label {
+  color: var(--text-primary);
 }
 
 .nav-badge {
   margin-left: auto;
-  min-width: 24px;
-  padding: 4px 7px;
+  min-width: 22px;
+  padding: 3px 7px;
   border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border: none;
   color: var(--accent);
   font-family: var(--font-mono);
   font-size: 10px;
@@ -362,10 +314,6 @@ const navItems = computed(() => [
   .sidebar {
     width: 208px;
     padding: 28px 10px 10px;
-  }
-
-  .brand-line h1 {
-    font-size: 26px;
   }
 
   .nav-label {

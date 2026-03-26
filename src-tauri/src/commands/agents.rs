@@ -7,7 +7,7 @@ use crate::errors::AppError;
 use crate::state::AppState;
 use crate::types::{Agent, AgentStatus, AgentTask};
 
-const DEFAULT_AGENT_IDS: &[&str] = &["forge", "prism", "jim"];
+const DEFAULT_AGENT_IDS: &[&str] = &["forge", "prism"];
 
 /// Default agent roster — used to seed the registry on startup.
 pub fn default_agents() -> Vec<Agent> {
@@ -55,29 +55,6 @@ pub fn default_agents() -> Vec<Agent> {
             last_seen: now.clone(),
             active_task_id: None,
         },
-        Agent {
-            id: "jim".into(),
-            name: "Jim".into(),
-            role: "Ops / Automation Agent".into(),
-            status: AgentStatus::Offline,
-            allowed_tools: vec![
-                "shell".into(),
-                "powershell".into(),
-                "filesystem".into(),
-                "cron".into(),
-                "pm".into(),
-            ],
-            skills: vec![
-                "Windows Automation".into(),
-                "PowerShell".into(),
-                "CI/CD".into(),
-                "Observability".into(),
-                "Task Orchestration".into(),
-                "Release Ops".into(),
-            ],
-            last_seen: now.clone(),
-            active_task_id: None,
-        },
     ]
 }
 
@@ -94,9 +71,12 @@ pub async fn get_agents(state: State<'_, AppState>) -> std::result::Result<Vec<A
 
     let mut agents: Vec<Agent> = agents_map.values().cloned().collect();
     // Stable ordering: default roster first, then others alphabetically
-    let order = ["forge", "prism", "jim"];
+    let order = ["forge", "prism"];
     agents.sort_by_key(|a| {
-        let pos = order.iter().position(|&id| id == a.id).unwrap_or(usize::MAX);
+        let pos = order
+            .iter()
+            .position(|&id| id == a.id)
+            .unwrap_or(usize::MAX);
         (pos, a.name.clone())
     });
 
@@ -125,7 +105,10 @@ pub async fn add_agent(
 ) -> std::result::Result<Agent, AppError> {
     // Validate: id must not collide with defaults or existing custom agents
     if DEFAULT_AGENT_IDS.contains(&agent.id.as_str()) {
-        return Err(AppError::Other(format!("ID '{}' is reserved for a built-in agent", agent.id)));
+        return Err(AppError::Other(format!(
+            "ID '{}' is reserved for a built-in agent",
+            agent.id
+        )));
     }
 
     // Persist in config
@@ -135,6 +118,9 @@ pub async fn add_agent(
         // Remove any existing entry with same id first (upsert)
         cfg.custom_agents.retain(|a| a.id != agent.id);
         cfg.custom_agents.push(agent);
+        cfg.agent_auth_tokens
+            .entry(live_agent.id.clone())
+            .or_insert_with(|| Uuid::new_v4().to_string());
         let json = serde_json::to_string_pretty(&*cfg)?;
         drop(cfg);
         tokio::fs::write(&state.config_path, json).await?;
@@ -155,11 +141,11 @@ pub async fn remove_agent(
     id: String,
     state: State<'_, AppState>,
 ) -> std::result::Result<(), AppError> {
-
     // Remove from config
     {
         let mut cfg = state.config.write().await;
         cfg.custom_agents.retain(|a| a.id != id);
+        cfg.agent_auth_tokens.remove(&id);
         let json = serde_json::to_string_pretty(&*cfg)?;
         drop(cfg);
         tokio::fs::write(&state.config_path, json).await?;
@@ -200,8 +186,13 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_agents_has_three_entries() {
-        assert_eq!(default_agents().len(), 3);
+    fn default_agents_has_two_entries() {
+        assert_eq!(default_agents().len(), 2);
+    }
+
+    #[test]
+    fn default_agents_do_not_include_jim() {
+        assert!(!default_agents().iter().any(|agent| agent.id == "jim"));
     }
 
     #[test]

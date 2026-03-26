@@ -29,19 +29,16 @@
           placeholder="search notes..."
         />
 
-        <div class="category-filters">
-          <button
-            class="cat-btn"
-            :class="{ active: notesStore.activeCategory === null }"
-            @click="notesStore.activeCategory = null"
-          >all</button>
-          <button
-            v-for="cat in categories"
-            :key="cat"
-            class="cat-btn"
-            :class="{ active: notesStore.activeCategory === cat }"
-            @click="notesStore.activeCategory = cat"
-          >{{ cat }}</button>
+        <div class="category-filter">
+          <label class="filter-label" for="notes-category-filter">category</label>
+          <select
+            id="notes-category-filter"
+            v-model="activeCategoryFilter"
+            class="category-dropdown glass-input"
+          >
+            <option value="__all__">all categories</option>
+            <option v-for="cat in categoryOptions" :key="cat" :value="cat">{{ cat }}</option>
+          </select>
         </div>
 
         <div class="note-list">
@@ -63,6 +60,8 @@
         <div v-if="activeNote" class="editor-frame">
           <NoteEditor
             :note="activeNote"
+            :categories="categoryOptions"
+            :quick-link-groups="quickLinkGroups"
             :saving="saving"
             :autosaving="autosaving"
             :autosave-state="autosaveState"
@@ -82,30 +81,116 @@
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import type { Note, NoteCategory } from "@/interfaces";
+import type { Note, NoteQuickLinkGroup, NoteQuickLinkOption } from "@/interfaces";
 import ViewHero from "@/components/layout/ViewHero.vue";
 import NoteEditor from "@/components/notes/NoteEditor.vue";
 import NeonButton from "@/components/ui/NeonButton.vue";
+import { useAgentStore } from "@/stores/useAgentStore";
+import { useConfigStore } from "@/stores/useConfigStore";
+import { useGithubStore } from "@/stores/useGithubStore";
 import { useNotesStore } from "@/stores/useNotesStore";
+import { useTaskStore } from "@/stores/useTaskStore";
 
 const notesStore = useNotesStore();
+const taskStore = useTaskStore();
+const agentStore = useAgentStore();
+const githubStore = useGithubStore();
+const configStore = useConfigStore();
 const saving = ref(false);
 const autosaving = ref(false);
 const autosaveState = ref<string | null>(null);
 let autosaveTimer: ReturnType<typeof setTimeout> | null = null;
 
-const categories: NoteCategory[] = ["prompts", "cli", "agents", "skills", "misc"];
-
 const activeNote = computed(() =>
   notesStore.notes.find((n) => n.id === notesStore.activeNoteId) ?? null
 );
+
+const categoryOptions = computed(() => {
+  const categories = notesStore.availableCategories.slice();
+  if (notesStore.activeCategory && !categories.includes(notesStore.activeCategory)) {
+    categories.push(notesStore.activeCategory);
+    categories.sort((a, b) => a.localeCompare(b));
+  }
+  return categories;
+});
+
+const quickLinkGroups = computed<NoteQuickLinkGroup[]>(() => {
+  const repoOptions: NoteQuickLinkOption[] = [
+    ...githubStore.repos.map((repo) => ({
+      id: repo.fullName,
+      kind: "repo" as const,
+      label: repo.name,
+      description: `${repo.fullName} / ${repo.openIssues} open`,
+      url: repo.htmlUrl,
+    })),
+    ...(configStore.config.githubTargets ?? [])
+      .filter(
+        (target) =>
+          !githubStore.repos.some((repo) => repo.owner === target.owner && repo.repo === target.repo)
+      )
+      .map((target) => ({
+        id: `${target.owner}/${target.repo}`,
+        kind: "repo" as const,
+        label: target.name,
+        description: `${target.owner}/${target.repo}`,
+        url: `https://github.com/${target.owner}/${target.repo}`,
+      })),
+  ];
+
+  const groups: NoteQuickLinkGroup[] = [
+    {
+      id: "tasks",
+      label: "tasks",
+      options: taskStore.tasks.map((task) => ({
+        id: task.id,
+        kind: "task" as const,
+        label: task.title,
+        description: `${task.project} / ${task.status}`,
+      })),
+    },
+    {
+      id: "agents",
+      label: "agents",
+      options: agentStore.agents.map((agent) => ({
+        id: agent.id,
+        kind: "agent" as const,
+        label: agent.name,
+        description: `${agent.role || "no role"} / ${agent.status}`,
+      })),
+    },
+    {
+      id: "repos",
+      label: "repos",
+      options: repoOptions,
+    },
+    {
+      id: "workspaces",
+      label: "workspaces",
+      options: (configStore.config.launchTargets ?? []).map((target) => ({
+        id: target.id,
+        kind: "launcher" as const,
+        label: target.name,
+        description: target.path,
+      })),
+    },
+  ];
+
+  return groups.filter((group) => group.options.length > 0);
+});
+
+const activeCategoryFilter = computed({
+  get: () => notesStore.activeCategory ?? "__all__",
+  set: (value: string) => {
+    notesStore.activeCategory = value === "__all__" ? null : value;
+  },
+});
 
 function selectNote(id: string) {
   notesStore.activeNoteId = id;
 }
 
 function createNote() {
-  const note = notesStore.newNote();
+  const note = notesStore.newNote(notesStore.activeCategory ?? undefined);
   notesStore.activeNoteId = note.id;
 }
 
@@ -141,7 +226,7 @@ watch(
           activeNote.value.title,
           activeNote.value.content,
           activeNote.value.category,
-          activeNote.value.tags.join("|"),
+          (activeNote.value.tags ?? []).join("|"),
         ]
       : null,
   () => {
@@ -175,7 +260,16 @@ watch(
 );
 
 onMounted(() => {
-  notesStore.loadNotes();
+  void notesStore.loadNotes();
+  if (taskStore.tasks.length === 0) {
+    void taskStore.fetchTasks();
+  }
+  if (agentStore.agents.length === 0) {
+    void agentStore.loadAgents();
+  }
+  if (githubStore.repos.length === 0 && (configStore.config.githubTargets?.length ?? 0) > 0) {
+    void githubStore.loadRepos();
+  }
 });
 
 onBeforeUnmount(() => {
@@ -248,29 +342,30 @@ onBeforeUnmount(() => {
   padding: 9px 12px;
 }
 
-.category-filters {
+.category-filter {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 6px;
 }
 
-.cat-btn {
-  padding: 6px 10px;
-  border-radius: var(--radius-pill);
-  border: 1px solid color-mix(in srgb, var(--glass-border) 88%, transparent);
-  background: color-mix(in srgb, var(--glass-bg) 80%, transparent);
-  color: var(--text-secondary);
-  cursor: pointer;
+.filter-label {
+  color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
-.cat-btn.active,
-.cat-btn:hover {
-  border-color: color-mix(in srgb, var(--accent) 28%, transparent);
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-  color: var(--accent);
+.category-dropdown {
+  width: 100%;
+  padding: 9px 12px;
+  font-size: 12px;
+  color: var(--text-primary);
+  background: var(--glass-bg);
+}
+
+.category-dropdown option {
+  background: var(--bg-surface);
 }
 
 .note-list {

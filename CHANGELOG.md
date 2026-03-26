@@ -3,6 +3,37 @@
 All notable changes to UMBRA are documented here.
 Format: [semver] - YYYY-MM-DD
 
+## [0.2.0] - 2026-03-26
+
+### Added
+- **Agent Workbench**: Full dispatch lifecycle — compose, select agent/workspace/mode/persona, submit to provider CLI (Codex/Claude/Gemini), track runs with events and artifacts, retry/cancel/continue
+- **Ops Room**: Native channel-based orchestration — messages, mention routing, jobs, approval queue, route rules, session templates, turn-taking, restart recovery, audit trail, pagination
+- **Provider Onboarding**: Inline checklist, auth check, smoke test, workspace bootstrap directly in Workbench and Ops Room
+- **Provider Presence**: Agent presence per channel, live run badges on jobs/messages, escalation rail for blocked/needs_input runs
+- **Dashboard Overhaul**: KPI bar chart, deployment registry, attention rail, upcoming deadlines, recent activity timeline, telemetry strip
+- **First-Run Onboarding Wizard**: Setup wizard for vault path, PM Tool URL, GitHub PAT, repo root on first launch
+- **Agent Auth Token Management**: Per-agent token UI in Settings with show/hide/copy/regenerate per agent
+- **Windows Build Pipeline**: GitHub Actions workflow (.exe + .msi via tauri-action, triggers on push to main + tags)
+- **Notes**: Category filter, autosave, markdown editor with live preview + Mermaid rendering, quick-link insertion for tasks/agents/repos
+- **Workspace Manager**: Inline workspace preset editor in Workbench/Ops Room with grant-root validation
+- **Threaded Replies**: Parent-threading for ops room messages with reply composer
+- **Session Templates**: Multi-agent orchestration workflow templates
+- **Browser E2E**: Smoke/E2E coverage for Workbench and Ops Room flows
+
+### Changed
+- Dashboard redesigned to Stitch Light Variant 3 design tokens (astraeus_command_light palette)
+- Light theme colors aligned to stitch spec (#00658d primary, #21bcff accent, #f7f9fb background)
+- Cron card light theme contrast fixed (white text on darker gradient)
+- Notes frontmatter parser fixed for tags/created_at/updated_at field mapping
+- Performance: content-visibility for heavy offscreen sections (kanban, registry, note-list, skills-grid)
+- Version bumped to 0.2.0 across package.json, Cargo.toml, tauri.conf.json
+
+### Fixed
+- Notes TypeError when opening notes with tags field parsed as string instead of array
+- Skills page loading from ~/.claude/skills/ in browser dev mode
+- Tasks PM Tool sync via Vite proxy (975 tasks across 20 projects)
+- Unused PM_TOOL_BASE variable in tauri-mock.ts removed
+
 ## [0.1.0.0] - 2026-03-17
 
 ### Added

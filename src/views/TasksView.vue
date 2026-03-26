@@ -6,9 +6,20 @@
       subtitle="pm board with drag, comments and lane sorting."
     >
       <template #meta>
-        <span v-if="taskStore.lastSync" class="view-hero-pill">synced {{ relativeSync }}</span>
-        <NeonButton size="sm" variant="secondary" ghost :loading="taskStore.loading" @click="sync">SYNC</NeonButton>
-        <NeonButton size="sm" variant="primary" @click="showNewTask = true">+ NEW</NeonButton>
+        <span v-if="taskStore.lastSync" class="view-hero-pill"
+          >synced {{ relativeSync }}</span
+        >
+        <NeonButton
+          size="sm"
+          variant="secondary"
+          ghost
+          :loading="taskStore.loading"
+          @click="sync"
+          >SYNC</NeonButton
+        >
+        <NeonButton size="sm" variant="primary" @click="showNewTask = true"
+          >+ NEW</NeonButton
+        >
       </template>
     </ViewHero>
 
@@ -16,7 +27,13 @@
     <div v-if="actionError" class="error-bar">{{ actionError }}</div>
 
     <div v-if="pmProjects.length > 0" class="project-filter">
-      <button class="proj-pill" :class="{ active: !activeProjectId }" @click="activeProjectId = null">ALL</button>
+      <button
+        class="proj-pill"
+        :class="{ active: !activeProjectId }"
+        @click="activeProjectId = null"
+      >
+        ALL
+      </button>
       <button
         v-for="project in pmProjects"
         :key="project.id"
@@ -29,13 +46,28 @@
     </div>
 
     <div class="board-toolbar">
-      <span class="drag-hint">drag between lanes to move tasks. priority sort rewrites order inside each lane.</span>
-      <NeonButton size="sm" variant="secondary" ghost :loading="sorting" :disabled="taskStore.tasks.length === 0" @click="sortByPriority">
+      <span class="drag-hint"
+        >drag between lanes to move tasks. priority sort rewrites order inside
+        each lane.</span
+      >
+      <NeonButton
+        size="sm"
+        variant="secondary"
+        ghost
+        :loading="sorting"
+        :disabled="taskStore.tasks.length === 0"
+        @click="sortByPriority"
+      >
         SORT BY PRIORITY
       </NeonButton>
     </div>
 
-    <div v-if="taskStore.loading && taskStore.tasks.length === 0" class="loading-state">Loading tasks...</div>
+    <div
+      v-if="taskStore.loading && taskStore.tasks.length === 0"
+      class="loading-state"
+    >
+      Loading tasks...
+    </div>
 
     <div v-else class="kanban">
       <div v-for="column in columns" :key="column.kind" class="kanban-col">
@@ -46,7 +78,11 @@
           <button
             class="lane-toggle"
             type="button"
-            :aria-label="isLaneCollapsed(column) ? `expand ${column.label}` : `collapse ${column.label}`"
+            :aria-label="
+              isLaneCollapsed(column)
+                ? `expand ${column.label}`
+                : `collapse ${column.label}`
+            "
             @click="toggleLane(column.kind)"
           >
             {{ isLaneCollapsed(column) ? "+" : "-" }}
@@ -56,7 +92,10 @@
         <div
           v-if="!isLaneCollapsed(column)"
           class="col-body"
-          :class="{ 'drop-target': dropTarget?.columnKind === column.kind && !dropTarget.taskId }"
+          :class="{
+            'drop-target':
+              dropTarget?.columnKind === column.kind && !dropTarget.taskId,
+          }"
           @dragover.prevent="onColumnDragOver(column.kind)"
           @dragleave="clearDropTarget"
           @drop.prevent="dropTask(column.kind)"
@@ -69,7 +108,9 @@
             class="task-card"
             :class="{
               dragging: draggingTaskId === task.id,
-              'drop-target': dropTarget?.columnKind === column.kind && dropTarget?.taskId === task.id,
+              'drop-target':
+                dropTarget?.columnKind === column.kind &&
+                dropTarget?.taskId === task.id,
             }"
             :variant="task.status === 'blocked' ? 'danger' : 'default'"
             :draggable="dragEnabled"
@@ -81,16 +122,24 @@
           >
             <div class="task-head">
               <div class="task-topline">
-                <span v-if="showProjectLabel" class="task-project">{{ task.project }}</span>
+                <span v-if="showProjectLabel" class="task-project">{{
+                  task.project
+                }}</span>
                 <div v-if="taskSupportMeta(task).length" class="task-support">
-                  <span v-for="item in taskSupportMeta(task)" :key="item">{{ item }}</span>
+                  <span v-for="item in taskSupportMeta(task)" :key="item">{{
+                    item
+                  }}</span>
                 </div>
-                <span class="task-priority" :class="task.priority">{{ task.priority }}</span>
+                <span class="task-priority" :class="task.priority">{{
+                  task.priority
+                }}</span>
               </div>
               <button
                 class="collapse-btn"
                 type="button"
-                :aria-label="isCollapsed(task) ? 'expand task' : 'collapse task'"
+                :aria-label="
+                  isCollapsed(task) ? 'expand task' : 'collapse task'
+                "
                 @click.stop="toggleTaskCollapse(task)"
               >
                 {{ isCollapsed(task) ? "+" : "-" }}
@@ -98,7 +147,9 @@
             </div>
             <div class="task-title">{{ task.title }}</div>
             <template v-if="!isCollapsed(task)">
-              <p v-if="taskSummary(task)" class="task-summary">{{ taskSummary(task) }}</p>
+              <p v-if="taskSummary(task)" class="task-summary">
+                {{ taskSummary(task) }}
+              </p>
 
               <div class="task-actions">
                 <button
@@ -111,8 +162,20 @@
                   {{ move.label }}
                 </button>
                 <div class="task-actions-right">
-                  <button class="edit-btn" title="Edit task" @click="openEdit(task)">EDIT</button>
-                  <button class="comment-btn" title="Add comment" @click="openComment(task)">COMMENT</button>
+                  <button
+                    class="edit-btn"
+                    title="Edit task"
+                    @click="openEdit(task)"
+                  >
+                    EDIT
+                  </button>
+                  <button
+                    class="comment-btn"
+                    title="Add comment"
+                    @click="openComment(task)"
+                  >
+                    COMMENT
+                  </button>
                 </div>
               </div>
             </template>
@@ -133,7 +196,11 @@
 
     <Teleport to="body">
       <Transition name="modal">
-        <div v-if="showNewTask" class="modal-backdrop" @click.self="showNewTask = false">
+        <div
+          v-if="showNewTask"
+          class="modal-backdrop"
+          @click.self="showNewTask = false"
+        >
           <div class="modal glass-panel">
             <div class="modal-header">
               <span class="modal-title">NEW TASK</span>
@@ -142,23 +209,48 @@
 
             <div class="form-field">
               <label class="form-label">TITLE</label>
-              <input v-model="newTitle" class="glass-input" placeholder="Task title..." autofocus />
+              <input
+                v-model="newTitle"
+                class="glass-input"
+                placeholder="Task title..."
+                autofocus
+              />
             </div>
 
             <div class="form-row">
               <div class="form-field">
                 <label class="form-label">PROJECT</label>
-                <select v-model="newProjectId" class="glass-input" @change="onProjectChange">
+                <select
+                  v-model="newProjectId"
+                  class="glass-input"
+                  @change="onProjectChange"
+                >
                   <option value="" disabled>Select project...</option>
-                  <option v-for="project in pmProjects" :key="project.id" :value="project.id">{{ project.name }}</option>
+                  <option
+                    v-for="project in pmProjects"
+                    :key="project.id"
+                    :value="project.id"
+                  >
+                    {{ project.name }}
+                  </option>
                 </select>
               </div>
 
               <div class="form-field">
                 <label class="form-label">COLUMN</label>
-                <select v-model="newColumnId" class="glass-input" :disabled="!newProjectId">
+                <select
+                  v-model="newColumnId"
+                  class="glass-input"
+                  :disabled="!newProjectId"
+                >
                   <option value="" disabled>Select column...</option>
-                  <option v-for="column in pmColumns" :key="column.id" :value="column.id">{{ column.name }}</option>
+                  <option
+                    v-for="column in pmColumns"
+                    :key="column.id"
+                    :value="column.id"
+                  >
+                    {{ column.name }}
+                  </option>
                 </select>
               </div>
             </div>
@@ -178,11 +270,21 @@
 
             <div class="form-field">
               <label class="form-label">DESCRIPTION</label>
-              <textarea v-model="newDescription" class="glass-input desc-input" placeholder="Context..." />
+              <textarea
+                v-model="newDescription"
+                class="glass-input desc-input"
+                placeholder="Context..."
+              />
             </div>
 
             <div class="modal-footer">
-              <NeonButton variant="secondary" ghost size="sm" @click="showNewTask = false">CANCEL</NeonButton>
+              <NeonButton
+                variant="secondary"
+                ghost
+                size="sm"
+                @click="showNewTask = false"
+                >CANCEL</NeonButton
+              >
               <NeonButton
                 variant="primary"
                 size="sm"
@@ -200,7 +302,11 @@
 
     <Teleport to="body">
       <Transition name="modal">
-        <div v-if="editTaskState" class="modal-backdrop" @click.self="editTaskState = null">
+        <div
+          v-if="editTaskState"
+          class="modal-backdrop"
+          @click.self="editTaskState = null"
+        >
           <div class="modal glass-panel">
             <div class="modal-header">
               <span class="modal-title">EDIT TASK</span>
@@ -209,7 +315,12 @@
 
             <div class="form-field">
               <label class="form-label">TITLE</label>
-              <input v-model="editTitle" class="glass-input" placeholder="Task title..." autofocus />
+              <input
+                v-model="editTitle"
+                class="glass-input"
+                placeholder="Task title..."
+                autofocus
+              />
             </div>
 
             <div class="form-row">
@@ -227,12 +338,28 @@
 
             <div class="form-field">
               <label class="form-label">DESCRIPTION</label>
-              <textarea v-model="editDescription" class="glass-input desc-input" placeholder="Context..." />
+              <textarea
+                v-model="editDescription"
+                class="glass-input desc-input"
+                placeholder="Context..."
+              />
             </div>
 
             <div class="modal-footer">
-              <NeonButton variant="secondary" ghost size="sm" @click="editTaskState = null">CANCEL</NeonButton>
-              <NeonButton variant="primary" size="sm" :loading="editing" :disabled="!editTitle.trim()" @click="submitEdit">
+              <NeonButton
+                variant="secondary"
+                ghost
+                size="sm"
+                @click="editTaskState = null"
+                >CANCEL</NeonButton
+              >
+              <NeonButton
+                variant="primary"
+                size="sm"
+                :loading="editing"
+                :disabled="!editTitle.trim()"
+                @click="submitEdit"
+              >
                 SAVE
               </NeonButton>
             </div>
@@ -243,20 +370,37 @@
 
     <Teleport to="body">
       <Transition name="modal">
-        <div v-if="commentTaskState" class="modal-backdrop" @click.self="commentTaskState = null">
+        <div
+          v-if="commentTaskState"
+          class="modal-backdrop"
+          @click.self="commentTaskState = null"
+        >
           <div class="modal glass-panel">
             <div class="modal-header">
               <span class="modal-title">ADD COMMENT</span>
-              <button class="close-btn" @click="commentTaskState = null">X</button>
+              <button class="close-btn" @click="commentTaskState = null">
+                X
+              </button>
             </div>
 
             <div class="form-field">
               <label class="form-label">{{ commentTaskState.title }}</label>
-              <textarea v-model="commentText" class="glass-input desc-input" placeholder="Write comment..." autofocus />
+              <textarea
+                v-model="commentText"
+                class="glass-input desc-input"
+                placeholder="Write comment..."
+                autofocus
+              />
             </div>
 
             <div class="modal-footer">
-              <NeonButton variant="secondary" ghost size="sm" @click="commentTaskState = null">CANCEL</NeonButton>
+              <NeonButton
+                variant="secondary"
+                ghost
+                size="sm"
+                @click="commentTaskState = null"
+                >CANCEL</NeonButton
+              >
               <NeonButton
                 variant="primary"
                 size="sm"
@@ -291,9 +435,14 @@ const moving = ref<string | null>(null);
 const sorting = ref(false);
 const activeProjectId = ref<string | null>(null);
 const draggingTaskId = ref<string | null>(null);
-const dropTarget = ref<{ columnKind: NonNullable<Task["columnKind"]>; taskId?: string } | null>(null);
+const dropTarget = ref<{
+  columnKind: NonNullable<Task["columnKind"]>;
+  taskId?: string;
+} | null>(null);
 const collapsedTaskIds = ref<Record<string, boolean>>({});
-const laneOverrides = ref<Partial<Record<NonNullable<Task["columnKind"]>, boolean>>>({ ...(configStore.config.taskLanePrefs ?? {}) });
+const laneOverrides = ref<
+  Partial<Record<NonNullable<Task["columnKind"]>, boolean>>
+>({ ...(configStore.config.taskLanePrefs ?? {}) });
 const dragEnabled = computed(() => filteredTasks.value.length > 0);
 const BACKLOG_AUTO_COLLAPSE_MIN = 6;
 const PRIORITY_WEIGHT: Record<Task["priority"], number> = {
@@ -321,7 +470,7 @@ function taskColumnKind(task: Task): NonNullable<Task["columnKind"]> {
 const filteredTasks = computed(() =>
   activeProjectId.value
     ? taskStore.tasks.filter((task) => task.projectId === activeProjectId.value)
-    : taskStore.tasks
+    : taskStore.tasks,
 );
 const showProjectLabel = computed(() => !activeProjectId.value);
 
@@ -333,37 +482,49 @@ const columns = computed(() =>
       .sort((a, b) => {
         const aPosition = a.position ?? Number.MAX_SAFE_INTEGER;
         const bPosition = b.position ?? Number.MAX_SAFE_INTEGER;
-        return aPosition - bPosition || PRIORITY_WEIGHT[b.priority] - PRIORITY_WEIGHT[a.priority];
+        return (
+          aPosition - bPosition ||
+          PRIORITY_WEIGHT[b.priority] - PRIORITY_WEIGHT[a.priority]
+        );
       }),
-  }))
+  })),
 );
 
-const MOVE_MAP: Record<NonNullable<Task["columnKind"]>, { label: string; columnKind: NonNullable<Task["columnKind"]> }[]> =
-  {
-    backlog: [{ label: "START", columnKind: "in_progress" }],
-    in_progress: [
-      { label: "REVIEW", columnKind: "review" },
-      { label: "BACKLOG", columnKind: "backlog" },
-    ],
-    review: [
-      { label: "DONE", columnKind: "done" },
-      { label: "WIP", columnKind: "in_progress" },
-    ],
-    done: [{ label: "REOPEN", columnKind: "in_progress" }],
-  };
+const MOVE_MAP: Record<
+  NonNullable<Task["columnKind"]>,
+  { label: string; columnKind: NonNullable<Task["columnKind"]> }[]
+> = {
+  backlog: [{ label: "START", columnKind: "in_progress" }],
+  in_progress: [
+    { label: "REVIEW", columnKind: "review" },
+    { label: "BACKLOG", columnKind: "backlog" },
+  ],
+  review: [
+    { label: "DONE", columnKind: "done" },
+    { label: "WIP", columnKind: "in_progress" },
+  ],
+  done: [{ label: "REOPEN", columnKind: "in_progress" }],
+};
 
 function moveOptions(task: Task) {
   return MOVE_MAP[taskColumnKind(task)] ?? [];
 }
 
-function defaultLaneCollapsed(column: { kind: NonNullable<Task["columnKind"]>; tasks: Task[] }) {
+function defaultLaneCollapsed(column: {
+  kind: NonNullable<Task["columnKind"]>;
+  tasks: Task[];
+}) {
   if (column.tasks.length === 0) return false;
   if (column.kind === "done" || column.kind === "review") return true;
-  if (column.kind === "backlog") return column.tasks.length >= BACKLOG_AUTO_COLLAPSE_MIN;
+  if (column.kind === "backlog")
+    return column.tasks.length >= BACKLOG_AUTO_COLLAPSE_MIN;
   return false;
 }
 
-function isLaneCollapsed(column: { kind: NonNullable<Task["columnKind"]>; tasks: Task[] }) {
+function isLaneCollapsed(column: {
+  kind: NonNullable<Task["columnKind"]>;
+  tasks: Task[];
+}) {
   const override = laneOverrides.value[column.kind];
   return (override ?? defaultLaneCollapsed(column)) && column.tasks.length > 0;
 }
@@ -380,9 +541,14 @@ function toggleLane(kind: NonNullable<Task["columnKind"]>) {
   void persistLanePrefs(nextPrefs);
 }
 
-async function persistLanePrefs(nextPrefs: Partial<Record<NonNullable<Task["columnKind"]>, boolean>>) {
+async function persistLanePrefs(
+  nextPrefs: Partial<Record<NonNullable<Task["columnKind"]>, boolean>>,
+) {
   try {
-    await configStore.saveConfig({ ...configStore.config, taskLanePrefs: nextPrefs });
+    await configStore.saveConfig({
+      ...configStore.config,
+      taskLanePrefs: nextPrefs,
+    });
   } catch {
     // Keep the local preference even if config persistence fails.
   }
@@ -410,7 +576,8 @@ function taskSupportMeta(task: Task) {
   const due = task.nextDueDate ?? task.deadline;
   if (due) {
     const date = new Date(due);
-    if (!Number.isNaN(date.getTime())) meta.push(`due ${date.toLocaleDateString()}`);
+    if (!Number.isNaN(date.getTime()))
+      meta.push(`due ${date.toLocaleDateString()}`);
   }
   if (task.comments?.length) meta.push(`${task.comments.length} comments`);
   return meta;
@@ -420,7 +587,10 @@ async function resolveProjectColumns(projectId: string) {
   return invoke<PmColumn[]>("get_pm_columns", { projectId });
 }
 
-async function moveTask(task: Task, targetKind: NonNullable<Task["columnKind"]>) {
+async function moveTask(
+  task: Task,
+  targetKind: NonNullable<Task["columnKind"]>,
+) {
   moving.value = task.id;
   actionError.value = null;
   try {
@@ -455,8 +625,16 @@ function onColumnDragOver(columnKind: NonNullable<Task["columnKind"]>) {
   dropTarget.value = { columnKind };
 }
 
-function onTaskDragOver(columnKind: NonNullable<Task["columnKind"]>, taskId: string) {
-  if (!dragEnabled.value || !draggingTaskId.value || draggingTaskId.value === taskId) return;
+function onTaskDragOver(
+  columnKind: NonNullable<Task["columnKind"]>,
+  taskId: string,
+) {
+  if (
+    !dragEnabled.value ||
+    !draggingTaskId.value ||
+    draggingTaskId.value === taskId
+  )
+    return;
   dropTarget.value = { columnKind, taskId };
 }
 
@@ -464,10 +642,15 @@ function clearDropTarget() {
   dropTarget.value = null;
 }
 
-async function dropTask(targetKind: NonNullable<Task["columnKind"]>, overTaskId?: string) {
+async function dropTask(
+  targetKind: NonNullable<Task["columnKind"]>,
+  overTaskId?: string,
+) {
   if (!dragEnabled.value || !draggingTaskId.value) return;
 
-  const task = filteredTasks.value.find((item) => item.id === draggingTaskId.value);
+  const task = filteredTasks.value.find(
+    (item) => item.id === draggingTaskId.value,
+  );
   if (!task) return;
 
   moving.value = task.id;
@@ -483,18 +666,28 @@ async function dropTask(targetKind: NonNullable<Task["columnKind"]>, overTaskId?
     }
 
     const laneIds = filteredTasks.value
-      .filter((item) => item.projectId === task.projectId && taskColumnKind(item) === targetKind)
+      .filter(
+        (item) =>
+          item.projectId === task.projectId &&
+          taskColumnKind(item) === targetKind,
+      )
       .filter((item) => item.id !== task.id)
       .map((item) => item.id);
 
-    const overTask = overTaskId ? filteredTasks.value.find((item) => item.id === overTaskId) : null;
-    const insertTargetId = overTask?.projectId === task.projectId ? overTask.id : undefined;
+    const overTask = overTaskId
+      ? filteredTasks.value.find((item) => item.id === overTaskId)
+      : null;
+    const insertTargetId =
+      overTask?.projectId === task.projectId ? overTask.id : undefined;
     const insertIndex = insertTargetId ? laneIds.indexOf(insertTargetId) : -1;
     if (insertIndex >= 0) laneIds.splice(insertIndex, 0, task.id);
     else laneIds.push(task.id);
 
     if (laneIds.length > 1) {
-      await invoke("reorder_pm_tasks", { columnId: target.id, taskIds: laneIds });
+      await invoke("reorder_pm_tasks", {
+        columnId: target.id,
+        taskIds: laneIds,
+      });
     }
 
     await taskStore.fetchTasks();
@@ -512,28 +705,40 @@ async function sortByPriority() {
   actionError.value = null;
 
   try {
-    const projectIds = [...new Set(filteredTasks.value.map((task) => task.projectId))];
+    const projectIds = [
+      ...new Set(filteredTasks.value.map((task) => task.projectId)),
+    ];
     const projectColumns = new Map<string, PmColumn[]>();
 
     await Promise.all(
       projectIds.map(async (projectId) => {
         projectColumns.set(projectId, await resolveProjectColumns(projectId));
-      })
+      }),
     );
 
     for (const projectId of projectIds) {
       for (const lane of COLUMNS) {
         const laneTasks = filteredTasks.value
-          .filter((task) => task.projectId === projectId && taskColumnKind(task) === lane.kind)
+          .filter(
+            (task) =>
+              task.projectId === projectId &&
+              taskColumnKind(task) === lane.kind,
+          )
           .sort((a, b) => {
-            const priorityDelta = PRIORITY_WEIGHT[b.priority] - PRIORITY_WEIGHT[a.priority];
+            const priorityDelta =
+              PRIORITY_WEIGHT[b.priority] - PRIORITY_WEIGHT[a.priority];
             if (priorityDelta !== 0) return priorityDelta;
-            return (a.position ?? Number.MAX_SAFE_INTEGER) - (b.position ?? Number.MAX_SAFE_INTEGER);
+            return (
+              (a.position ?? Number.MAX_SAFE_INTEGER) -
+              (b.position ?? Number.MAX_SAFE_INTEGER)
+            );
           });
 
         if (laneTasks.length < 2) continue;
 
-        const column = projectColumns.get(projectId)?.find((item) => item.kind === lane.kind);
+        const column = projectColumns
+          .get(projectId)
+          ?.find((item) => item.kind === lane.kind);
         if (!column) continue;
 
         await invoke("reorder_pm_tasks", {
@@ -565,7 +770,9 @@ async function loadProjects() {
   try {
     pmProjects.value = await invoke<PmProject[]>("get_pm_projects");
     if (!activeProjectId.value) {
-      activeProjectId.value = pmProjects.value.find((project) => project.name === "UMBRA")?.id ?? null;
+      activeProjectId.value =
+        pmProjects.value.find((project) => project.name === "UMBRA")?.id ??
+        null;
     }
   } catch {
     pmProjects.value = [];
@@ -584,7 +791,8 @@ async function onProjectChange() {
 }
 
 async function createTask() {
-  if (!newTitle.value.trim() || !newProjectId.value || !newColumnId.value) return;
+  if (!newTitle.value.trim() || !newProjectId.value || !newColumnId.value)
+    return;
   creating.value = true;
   actionError.value = null;
   try {
@@ -654,7 +862,11 @@ async function submitComment() {
   commenting.value = true;
   actionError.value = null;
   try {
-    await invoke("add_pm_comment", { taskId: commentTaskState.value.id, content: commentText.value.trim() });
+    await invoke("add_pm_comment", {
+      taskId: commentTaskState.value.id,
+      content: commentText.value.trim(),
+    });
+    await taskStore.fetchTasks();
     commentTaskState.value = null;
     commentText.value = "";
   } catch (e) {
@@ -681,11 +893,15 @@ watch(
   (prefs) => {
     laneOverrides.value = { ...(prefs ?? {}) };
   },
-  { deep: true }
+  { deep: true },
 );
 
 onMounted(async () => {
-  await Promise.all([taskStore.fetchTasks(), taskStore.setupLiveUpdates(), loadProjects()]);
+  await Promise.all([
+    taskStore.fetchTasks(),
+    taskStore.setupLiveUpdates(),
+    loadProjects(),
+  ]);
 });
 </script>
 
@@ -760,18 +976,18 @@ onMounted(async () => {
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.12em;
-  padding: 6px 10px;
+  padding: 5px 10px;
   border-radius: var(--radius-pill);
-  border: 1px solid color-mix(in srgb, var(--glass-border) 88%, transparent);
-  background: color-mix(in srgb, var(--glass-bg) 80%, transparent);
-  color: var(--text-secondary);
+  border: none;
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
+  color: var(--text-muted);
   cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .proj-pill.active,
 .proj-pill:hover {
-  background: var(--accent-dim);
-  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-surface));
   color: var(--accent);
 }
 
@@ -966,9 +1182,10 @@ onMounted(async () => {
 .task-priority {
   margin-left: auto;
   text-transform: uppercase;
-  padding: 3px 7px;
+  padding: 3px 8px;
   border-radius: var(--radius-pill);
-  border: 1px solid;
+  border: none;
+  font-weight: 500;
 }
 
 .task-support {
@@ -1014,62 +1231,53 @@ onMounted(async () => {
 }
 
 .task-priority.critical {
-  color: var(--accent-error);
-  border-color: rgba(239, 68, 68, 0.3);
-  background: rgba(239, 68, 68, 0.08);
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.12);
 }
 
 .task-priority.urgent {
-  color: #ff5f7a;
-  border-color: rgba(255, 95, 122, 0.35);
-  background: rgba(255, 95, 122, 0.1);
+  color: #f472b6;
+  background: rgba(244, 114, 182, 0.12);
 }
 
 .task-priority.high {
   color: var(--neon-amber);
-  border-color: rgba(245, 158, 11, 0.3);
-  background: rgba(245, 158, 11, 0.08);
+  background: rgba(245, 158, 11, 0.12);
 }
 
 .task-priority.medium {
   color: var(--accent);
-  border-color: var(--glass-border);
-  background: var(--bg-surface);
+  background: var(--accent-dim);
 }
 
 .task-priority.low {
   color: var(--text-muted);
-  border-color: var(--glass-border);
+  background: color-mix(in srgb, var(--bg-surface) 80%, transparent);
 }
 
 :global([data-theme="light"]) .task-priority.critical {
-  color: #b91c1c;
-  border-color: rgba(185, 28, 28, 0.2);
-  background: rgba(254, 226, 226, 0.92);
+  color: #dc2626;
+  background: rgba(254, 226, 226, 0.7);
 }
 
 :global([data-theme="light"]) .task-priority.urgent {
   color: #be123c;
-  border-color: rgba(190, 24, 93, 0.18);
-  background: rgba(255, 228, 230, 0.94);
+  background: rgba(255, 228, 230, 0.7);
 }
 
 :global([data-theme="light"]) .task-priority.high {
-  color: #b45309;
-  border-color: rgba(180, 83, 9, 0.18);
-  background: rgba(255, 247, 237, 0.94);
+  color: #d97706;
+  background: rgba(254, 243, 199, 0.7);
 }
 
 :global([data-theme="light"]) .task-priority.medium {
-  color: #0f766e;
-  border-color: rgba(15, 118, 110, 0.16);
-  background: rgba(240, 253, 250, 0.94);
+  color: #0e7490;
+  background: rgba(207, 250, 254, 0.6);
 }
 
 :global([data-theme="light"]) .task-priority.low {
-  color: rgba(15, 23, 42, 0.68);
-  border-color: rgba(15, 23, 42, 0.12);
-  background: rgba(248, 250, 252, 0.94);
+  color: #6e7881;
+  background: rgba(241, 245, 249, 0.7);
 }
 
 .task-actions {

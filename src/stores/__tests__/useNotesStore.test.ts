@@ -77,6 +77,21 @@ describe("useNotesStore", () => {
     expect(store.activeNoteId).toBe(note.id);
   });
 
+  it("derives available categories and uses the active one for new notes", () => {
+    const store = useNotesStore();
+    store.notes = [
+      makeNote({ id: "1", category: "field ops" }),
+      makeNote({ id: "2", category: "misc" }),
+      makeNote({ id: "3", category: "field ops" }),
+    ];
+
+    expect(store.availableCategories).toEqual(["field ops", "misc"]);
+
+    store.activeCategory = "field ops";
+    const note = store.newNote();
+    expect(note.category).toBe("field ops");
+  });
+
   it("saveNote calls invoke and updates note in list", async () => {
     const store = useNotesStore();
     const note = makeNote();

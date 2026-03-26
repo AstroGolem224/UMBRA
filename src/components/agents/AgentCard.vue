@@ -44,7 +44,6 @@ defineEmits<{ select: [agent: Agent] }>();
 const agentIcons: Record<string, string> = {
   prism: "PR",
   forge: "FG",
-  jim: "JM",
 };
 
 const agentIcon = agentIcons[props.agent.id] ?? "AG";
@@ -124,8 +123,8 @@ function formatRelative(isoDate: string): string {
 .skill-tag {
   padding: 4px 8px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--glass-bg) 84%, transparent);
-  border: 1px solid color-mix(in srgb, var(--glass-border) 88%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-surface));
+  border: none;
   color: var(--text-secondary);
   font-family: var(--font-mono);
   font-size: 10px;

@@ -5,5 +5,7 @@ pub mod github;
 pub mod integrations;
 pub mod launcher;
 pub mod notes;
+pub mod ops_room;
 pub mod plugins;
 pub mod updates;
+pub mod workbench;

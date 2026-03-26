@@ -1,6 +1,7 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { nextTick, reactive } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createPinia, setActivePinia } from "pinia";
 
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
@@ -20,6 +21,7 @@ import SkillsView from "../SkillsView.vue";
 describe("SkillsView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    setActivePinia(createPinia());
     mocks.useConfigStore.mockReturnValue(
       reactive({
         config: {
@@ -35,7 +37,7 @@ describe("SkillsView", () => {
         version: "1.0.0",
         description: "Systematic QA",
         category: "gstack",
-        agents: ["forge", "jim"],
+        agents: ["forge", "prism"],
         content: "qa content",
         folder: "gstack/qa",
       },
@@ -45,7 +47,7 @@ describe("SkillsView", () => {
         version: "1.1.0",
         description: "Release workflow",
         category: "core",
-        agents: ["jim"],
+        agents: ["prism"],
         content: "ship content",
         folder: "ship",
       },
@@ -65,6 +67,7 @@ describe("SkillsView", () => {
   it("loads skills, supports keyboard navigation and category-agent filtering", async () => {
     const wrapper = mount(SkillsView, {
       global: {
+        plugins: [createPinia()],
         stubs: {
           Transition: false,
         },
@@ -86,7 +89,7 @@ describe("SkillsView", () => {
     expect(wrapper.text()).toContain("ship content");
 
     const categoryButton = wrapper.findAll(".filter-pill").find((button) => button.text() === "gstack");
-    const agentButton = wrapper.findAll(".filter-pill").find((button) => button.text() === "jim");
+    const agentButton = wrapper.findAll(".filter-pill").find((button) => button.text() === "prism");
 
     await categoryButton!.trigger("click");
     await agentButton!.trigger("click");

@@ -514,8 +514,8 @@ async function openRepoPulls(target: GithubOpenTarget) {
 
 .refresh-btn {
   padding: 4px 8px;
-  background: color-mix(in srgb, var(--glass-bg) 82%, transparent);
-  border: 1px solid color-mix(in srgb, var(--glass-border) 88%, transparent);
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
+  border: none;
   border-radius: var(--radius-pill);
   color: var(--text-secondary);
   cursor: pointer;
@@ -523,12 +523,12 @@ async function openRepoPulls(target: GithubOpenTarget) {
   font-size: 10px;
   text-transform: uppercase;
   line-height: 1;
-  transition: color 0.2s, border-color 0.2s;
+  transition: color 0.2s, background 0.2s;
 }
 
 .refresh-btn:hover {
   color: var(--accent);
-  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-surface));
 }
 
 .refresh-btn.spinning {
@@ -783,7 +783,7 @@ async function openRepoPulls(target: GithubOpenTarget) {
 
 :global([data-theme="light"]) .refresh-btn,
 :global([data-theme="light"]) .open-btn {
-  background: rgba(255, 255, 255, 0.88);
+  background: rgba(0, 101, 141, 0.06);
 }
 
 :global([data-theme="light"]) .open-btn.subtle,

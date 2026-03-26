@@ -110,17 +110,18 @@ function cycleTheme() {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 32px;
-  padding: 6px 12px;
+  min-height: 28px;
+  padding: 5px 11px;
   border-radius: var(--radius-pill);
-  border: 1px solid color-mix(in srgb, var(--glass-border) 88%, transparent);
-  background: color-mix(in srgb, var(--glass-bg) 84%, transparent);
+  border: none;
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-surface));
   color: var(--text-secondary);
   font-family: var(--font-mono);
-  font-size: 11px;
-  letter-spacing: 0.04em;
+  font-size: 10px;
+  letter-spacing: 0.06em;
   line-height: 1;
   text-decoration: none;
+  text-transform: uppercase;
 }
 
 .view-hero__pill--button {
@@ -130,14 +131,19 @@ function cycleTheme() {
 
 .view-hero__pill--button:hover {
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--accent) 22%, var(--glass-border));
-  background: color-mix(in srgb, var(--accent) 8%, var(--glass-bg));
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-surface));
+  color: var(--accent);
 }
 
 :deep(.view-hero-pill.is-stale),
 :deep(.view-hero-pill.is-danger) {
   color: var(--accent-error);
-  border-color: rgba(239, 68, 68, 0.28);
+  background: rgba(239, 68, 68, 0.10);
+}
+
+:deep(.view-hero-pill.nominal-pill) {
+  color: var(--accent-success);
+  background: rgba(76, 175, 80, 0.10);
 }
 
 @media (max-width: 960px) {
@@ -154,15 +160,27 @@ function cycleTheme() {
 
 <style>
 [data-theme="light"] .view-hero {
-  border-color: rgba(8, 145, 178, 0.14);
+  border-color: rgba(189, 200, 209, 0.48);
   background:
-    radial-gradient(circle at top right, rgba(8, 145, 178, 0.12), transparent 34%),
-    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(236, 243, 248, 0.94));
-  box-shadow: 0 18px 32px rgba(15, 23, 42, 0.06);
+    radial-gradient(circle at top right, rgba(33, 188, 255, 0.16), transparent 34%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(242, 244, 246, 0.88));
+  box-shadow: 0 24px 44px rgba(0, 101, 141, 0.08);
 }
 
 [data-theme="light"] .view-hero__pill,
 [data-theme="light"] .view-hero-pill {
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(0, 101, 141, 0.06);
+  color: #3d4850;
+}
+
+[data-theme="light"] .view-hero-pill.nominal-pill {
+  color: #166534;
+  background: rgba(22, 163, 74, 0.08);
+}
+
+[data-theme="light"] .view-hero-pill.is-stale,
+[data-theme="light"] .view-hero-pill.is-danger {
+  color: #b91c1c;
+  background: rgba(239, 68, 68, 0.08);
 }
 </style>

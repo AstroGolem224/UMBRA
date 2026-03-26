@@ -19,7 +19,7 @@ Standard: `forge` / `Forge` falls nicht gesetzt.
         "hooks": [
           {
             "type": "command",
-            "command": "bash -c 'AGENT_ID=${UMBRA_AGENT_ID:-forge}; AGENT_NAME=${UMBRA_AGENT_NAME:-Forge}; AGENT_ROLE=${UMBRA_AGENT_ROLE:-Code Agent}; curl -s --connect-timeout 3 -X POST http://100.98.137.48:8765/api/agents/$AGENT_ID/heartbeat -H \"Content-Type: application/json\" -H \"X-Agent-Token: umbra-uap-2026\" -d \"{\\\"name\\\":\\\"$AGENT_NAME\\\",\\\"role\\\":\\\"$AGENT_ROLE\\\",\\\"status\\\":\\\"online\\\"}\" > /dev/null 2>&1 || true'"
+            "command": "bash -c 'AGENT_ID=${UMBRA_AGENT_ID:-forge}; AGENT_NAME=${UMBRA_AGENT_NAME:-Forge}; AGENT_ROLE=${UMBRA_AGENT_ROLE:-Code Agent}; AGENT_TOKEN=${UMBRA_AGENT_TOKEN:?set UMBRA_AGENT_TOKEN}; curl -s --connect-timeout 3 -X POST http://100.98.137.48:8765/api/agents/$AGENT_ID/heartbeat -H \"Content-Type: application/json\" -H \"X-Agent-Token: $AGENT_TOKEN\" -d \"{\\\"name\\\":\\\"$AGENT_NAME\\\",\\\"role\\\":\\\"$AGENT_ROLE\\\",\\\"status\\\":\\\"online\\\"}\" > /dev/null 2>&1 || true'"
           }
         ]
       }
@@ -34,6 +34,7 @@ Umgebungsvariablen in der Shell setzen (z.B. in `.bashrc` / `.zshrc`):
 export UMBRA_AGENT_ID="forge"
 export UMBRA_AGENT_NAME="Forge"
 export UMBRA_AGENT_ROLE="Web / Code Agent"
+export UMBRA_AGENT_TOKEN="<token from UMBRA agents view>"
 ```
 
 ---
@@ -42,7 +43,7 @@ export UMBRA_AGENT_ROLE="Web / Code Agent"
 
 ```
 POST http://100.98.137.48:8765/api/agents/:id/heartbeat
-X-Agent-Token: umbra-uap-2026
+X-Agent-Token: <agent-specific token from UMBRA>
 Content-Type: application/json
 
 {
@@ -88,7 +89,7 @@ AGENT_ROLE="${UMBRA_AGENT_ROLE:-Code Agent}"
 RESPONSE=$(curl -s --connect-timeout 3 \
   -X POST http://100.98.137.48:8765/api/agents/$AGENT_ID/heartbeat \
   -H "Content-Type: application/json" \
-  -H "X-Agent-Token: umbra-uap-2026" \
+  -H "X-Agent-Token: ${UMBRA_AGENT_TOKEN:?set UMBRA_AGENT_TOKEN}" \
   -d "{\"name\":\"$AGENT_NAME\",\"role\":\"$AGENT_ROLE\",\"status\":\"online\"}")
 
 # Pending Tasks ausgeben falls vorhanden
@@ -111,7 +112,7 @@ Agenten **müssen** ihren Status vor und nach jeder Aufgabe explizit melden.
 ```bash
 curl -s --connect-timeout 3 -X POST http://100.98.137.48:8765/api/agents/${UMBRA_AGENT_ID:-forge}/heartbeat \
   -H "Content-Type: application/json" \
-  -H "X-Agent-Token: umbra-uap-2026" \
+  -H "X-Agent-Token: ${UMBRA_AGENT_TOKEN:?set UMBRA_AGENT_TOKEN}" \
   -d "{\"name\":\"${UMBRA_AGENT_NAME:-Forge}\",\"status\":\"working\",\"activeTaskId\":\"<kurze Beschreibung oder Task-ID>\"}" > /dev/null 2>&1 || true
 ```
 
@@ -120,7 +121,7 @@ curl -s --connect-timeout 3 -X POST http://100.98.137.48:8765/api/agents/${UMBRA
 ```bash
 curl -s --connect-timeout 3 -X POST http://100.98.137.48:8765/api/agents/${UMBRA_AGENT_ID:-forge}/heartbeat \
   -H "Content-Type: application/json" \
-  -H "X-Agent-Token: umbra-uap-2026" \
+  -H "X-Agent-Token: ${UMBRA_AGENT_TOKEN:?set UMBRA_AGENT_TOKEN}" \
   -d "{\"name\":\"${UMBRA_AGENT_NAME:-Forge}\",\"status\":\"idle\",\"activeTaskId\":null}" > /dev/null 2>&1 || true
 ```
 
@@ -138,8 +139,8 @@ Nach Abschluss der Aufgabe (oder bei Sitzungsende):
 - Status auf `idle` setzen: `POST .../heartbeat` mit `{"status":"idle","activeTaskId":null}`
 
 Endpoint: `http://100.98.137.48:8765/api/agents/<agent-id>/heartbeat`
-Token: `X-Agent-Token: umbra-uap-2026`
-Variablen: `UMBRA_AGENT_ID`, `UMBRA_AGENT_NAME`, `UMBRA_AGENT_ROLE`
+Token: `X-Agent-Token: <agent-specific token>`
+Variablen: `UMBRA_AGENT_ID`, `UMBRA_AGENT_NAME`, `UMBRA_AGENT_ROLE`, `UMBRA_AGENT_TOKEN`
 ```
 
 ### Status-Werte (vollständig)

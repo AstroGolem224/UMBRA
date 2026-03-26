@@ -14,17 +14,47 @@
         </div>
       </main>
     </div>
+    <CommandPalette />
+    <ToastContainer />
+    <OnboardingWizard v-if="showOnboarding" @done="showOnboarding = false" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onErrorCaptured, onMounted, ref } from "vue";
+import { listen } from "@tauri-apps/api/event";
+import { computed, onBeforeUnmount, onErrorCaptured, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import CommandPalette from "@/components/shell/CommandPalette.vue";
+import OnboardingWizard from "@/components/shell/OnboardingWizard.vue";
+import ToastContainer from "@/components/ui/ToastContainer.vue";
+import { useConfigStore } from "@/stores/useConfigStore";
+import { useTaskStore } from "@/stores/useTaskStore";
 import CustomTitlebar from "./CustomTitlebar.vue";
 import AppSidebar from "./AppSidebar.vue";
 
+const configStore = useConfigStore();
+
 const router = useRouter();
+const taskStore = useTaskStore();
 const renderError = ref<string | null>(null);
+const onboardingDismissed = ref(false);
+
+const needsSetup = computed(() => {
+  if (!configStore.loaded) return false;
+  const c = configStore.config;
+  return !c.vaultPath && !c.pmToolUrl && !c.repoRootPath;
+});
+
+const showOnboarding = computed({
+  get: () =>
+    needsSetup.value &&
+    !onboardingDismissed.value &&
+    localStorage.getItem("umbra-onboarding-done") !== "1",
+  set: (v: boolean) => {
+    if (!v) onboardingDismissed.value = true;
+  },
+});
+let unlistenTraySync: (() => void) | null = null;
 
 onErrorCaptured((err) => {
   renderError.value = String(err);
@@ -36,12 +66,21 @@ function handleGlobalError(event: Event) {
   renderError.value = detail?.message ?? "unexpected application error";
 }
 
-onMounted(() => {
+onMounted(async () => {
   window.addEventListener("umbra:error", handleGlobalError as EventListener);
+  try {
+    unlistenTraySync = await listen("tray-sync-pm", async () => {
+      await taskStore.fetchTasks();
+    });
+  } catch {
+    unlistenTraySync = null;
+  }
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener("umbra:error", handleGlobalError as EventListener);
+  unlistenTraySync?.();
+  unlistenTraySync = null;
 });
 
 function retry() {

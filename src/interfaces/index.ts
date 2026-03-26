@@ -18,7 +18,7 @@ export interface AgentTask {
   priority: "critical" | "high" | "medium" | "low";
 }
 
-export type NoteCategory = "prompts" | "cli" | "agents" | "skills" | "misc";
+export type NoteCategory = string;
 
 export interface Note {
   id: string;
@@ -65,6 +65,181 @@ export interface AgentCronJob {
   notes?: string | null;
   source?: string | null;
   command?: string | null;
+  updatedAt: string;
+}
+
+export interface WorkspacePreset {
+  id: string;
+  name: string;
+  rootPath: string;
+  writable: boolean;
+  allowedProviders: string[];
+  allowedAgents: string[];
+}
+
+export interface WorkspaceBootstrapResult {
+  providerId: string;
+  workspaceId: string;
+  files: string[];
+  summary: string;
+}
+
+export interface ProviderCommandConfig {
+  providerId: string;
+  command: string;
+}
+
+export interface PersonaPreset {
+  id: string;
+  name: string;
+  description: string;
+  prompt: string;
+}
+
+export type DispatchMode = "chat" | "task";
+export type DispatchStatus = "draft" | "queued" | "working" | "done" | "error" | "cancelled";
+export type RunOutcomeStatus = "succeeded" | "blocked" | "needs_input";
+
+export interface DispatchRun {
+  id: string;
+  parentRunId?: string | null;
+  channelId?: string | null;
+  sourceMessageId?: string | null;
+  jobId?: string | null;
+  sessionId?: string | null;
+  mode: DispatchMode;
+  agentId: string;
+  providerId: string;
+  workspaceId: string;
+  pmTaskId?: string | null;
+  prompt: string;
+  personaId?: string | null;
+  outcomeStatus?: RunOutcomeStatus | null;
+  status: DispatchStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RunEvent {
+  id: string;
+  runId: string;
+  type: "user_message" | "system" | "stdout" | "stderr" | "agent_message";
+  body: string;
+  createdAt: string;
+}
+
+export interface RunEventPage {
+  items: RunEvent[];
+  nextBefore?: string | null;
+  hasMore: boolean;
+}
+
+export interface RunArtifact {
+  id: string;
+  runId: string;
+  kind: "summary" | "file" | "test";
+  label: string;
+  value: string;
+  createdAt: string;
+}
+
+export type ChannelMessageKind = "user" | "agent" | "system";
+
+export interface OpsChannel {
+  id: string;
+  name: string;
+  description: string;
+  workspaceId: string;
+  defaultAgentId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OpsChannelMessage {
+  id: string;
+  channelId: string;
+  parentMessageId?: string | null;
+  runId?: string | null;
+  jobId?: string | null;
+  sessionId?: string | null;
+  agentId?: string | null;
+  authorLabel?: string | null;
+  kind: ChannelMessageKind;
+  body: string;
+  createdAt: string;
+}
+
+export interface OpsChannelMessagePage {
+  items: OpsChannelMessage[];
+  nextBefore?: string | null;
+  hasMore: boolean;
+}
+
+export type OpsJobStatus = "open" | "running" | "blocked" | "done";
+
+export interface OpsJob {
+  id: string;
+  channelId: string;
+  sourceMessageId: string;
+  title: string;
+  summary: string;
+  agentId: string;
+  workspaceId: string;
+  pmTaskId?: string | null;
+  runId?: string | null;
+  status: OpsJobStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type RouteApprovalStatus = "pending" | "approved" | "rejected";
+
+export interface OpsRouteApproval {
+  id: string;
+  channelId: string;
+  messageId: string;
+  agentId: string;
+  workspaceId: string;
+  reason: string;
+  status: RouteApprovalStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OpsRule {
+  id: string;
+  name: string;
+  pattern: string;
+  targetAgentId?: string | null;
+  workspaceId?: string | null;
+  enabled: boolean;
+  requiresHumanGate: boolean;
+  lastTriggeredAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type OpsSessionState = "active" | "paused" | "completed";
+
+export interface OpsSessionTemplate {
+  id: string;
+  name: string;
+  workspaceId: string;
+  agentIds: string[];
+  autoAdvance: boolean;
+  requiresHumanGate: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OpsSession {
+  id: string;
+  channelId: string;
+  templateId: string;
+  state: OpsSessionState;
+  currentTurnIndex: number;
+  awaitingHumanGate: boolean;
+  createdAt: string;
   updatedAt: string;
 }
 
@@ -132,6 +307,41 @@ export interface RepoInfo {
   htmlUrl: string;
 }
 
+export interface SkillInfo {
+  id: string;
+  name: string;
+  version: string;
+  description: string;
+  category: string;
+  agents: string[];
+  content: string;
+  folder: string;
+}
+
+export type NoteQuickLinkKind = "task" | "agent" | "repo" | "launcher";
+
+export interface NoteQuickLinkOption {
+  id: string;
+  kind: NoteQuickLinkKind;
+  label: string;
+  description?: string;
+  url?: string;
+}
+
+export interface NoteQuickLinkGroup {
+  id: string;
+  label: string;
+  options: NoteQuickLinkOption[];
+}
+
+export interface SavedNoteAttachment {
+  fileName: string;
+  absolutePath: string;
+  relativePath: string;
+  markdown: string;
+  isImage: boolean;
+}
+
 export interface AgentNote {
   notes: string;
   link: string;
@@ -152,11 +362,46 @@ export interface UpdateCheckResult {
   version?: string | null;
 }
 
+export interface ProviderProbeResult {
+  providerId: string;
+  command: string;
+  launchable: boolean;
+  exitCode?: number | null;
+  summary: string;
+}
+
+export interface ProviderAuthState {
+  providerId: string;
+  agentIds: string[];
+  provisionedCount: number;
+  summary: string;
+}
+
+export interface ProviderSetupChecklistItem {
+  key: string;
+  label: string;
+  ready: boolean;
+  detail: string;
+}
+
+export interface ProviderSetupChecklistResult {
+  providerId: string;
+  workspaceId: string;
+  items: ProviderSetupChecklistItem[];
+  summary: string;
+}
+
 export interface AppConfig {
   theme: string;
+  closeToTray: boolean;
   vaultPath: string;
   notesSubdir: string;
   repoRootPath: string;
+  workspacePresets: WorkspacePreset[];
+  workspaceGrantRoots: string[];
+  defaultWorkspaceId?: string | null;
+  personaPresets: PersonaPreset[];
+  providerCommands: ProviderCommandConfig[];
   launchTargets?: LaunchTarget[];
   githubTargets?: GithubOpenTarget[];
   pmToolUrl: string;
@@ -171,5 +416,6 @@ export interface AppConfig {
   githubPat?: string;
   taskLanePrefs?: Partial<Record<PmColumn["kind"], boolean>>;
   agentNotes?: Record<string, AgentNote>;
+  agentAuthTokens?: Record<string, string>;
   customAgents?: CustomAgentConfig[];
 }

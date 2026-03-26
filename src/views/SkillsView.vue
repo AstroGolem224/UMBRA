@@ -8,7 +8,7 @@
       <template #meta>
         <span class="view-hero-pill">{{ categories.length }} categories</span>
         <span class="view-hero-pill">{{ agents.length }} agents</span>
-        <NeonButton size="sm" variant="secondary" ghost :loading="loading" @click="load">REFRESH</NeonButton>
+        <NeonButton size="sm" variant="secondary" ghost :loading="skillsStore.loading" @click="load">REFRESH</NeonButton>
       </template>
     </ViewHero>
 
@@ -62,8 +62,8 @@
       </div>
     </div>
 
-    <div v-if="loading" class="loading">Scanning ~/.codex/skills/...</div>
-    <div v-else-if="error" class="error-msg">{{ error }}</div>
+    <div v-if="skillsStore.loading" class="loading">Scanning ~/.codex/skills/...</div>
+    <div v-else-if="skillsStore.error" class="error-msg">{{ skillsStore.error }}</div>
     <div v-else class="skills-grid">
       <GlassCard
         v-for="skill in filtered"
@@ -87,39 +87,39 @@
     </div>
 
     <Transition name="fade">
-      <div v-if="selected" class="skill-modal-backdrop" @click.self="selected = null">
+      <div v-if="skillsStore.selectedSkill" class="skill-modal-backdrop" @click.self="skillsStore.selectSkill(null)">
         <div class="skill-modal glass-panel">
           <div class="modal-header">
-            <span class="modal-title">{{ selected.name }}</span>
-            <button class="close-btn" @click="selected = null">X</button>
+            <span class="modal-title">{{ skillsStore.selectedSkill.name }}</span>
+            <button class="close-btn" @click="skillsStore.selectSkill(null)">X</button>
           </div>
 
           <div class="modal-grid">
             <div class="modal-section">
               <span class="modal-label">VERSION</span>
-              <span class="modal-val">{{ selected.version || "n/a" }}</span>
+              <span class="modal-val">{{ skillsStore.selectedSkill.version || "n/a" }}</span>
             </div>
             <div class="modal-section">
               <span class="modal-label">CATEGORY</span>
-              <span class="modal-val">{{ selected.category }}</span>
+              <span class="modal-val">{{ skillsStore.selectedSkill.category }}</span>
             </div>
             <div class="modal-section">
               <span class="modal-label">FOLDER</span>
-              <span class="modal-val mono">~/.codex/skills/{{ selected.folder }}</span>
+              <span class="modal-val mono">~/.codex/skills/{{ skillsStore.selectedSkill.folder }}</span>
             </div>
             <div class="modal-section">
               <span class="modal-label">AGENTS</span>
               <div class="modal-chip-row">
-                <span v-for="agent in selected.agents" :key="agent" class="skill-chip agent">{{ agent }}</span>
+                <span v-for="agent in skillsStore.selectedSkill.agents" :key="agent" class="skill-chip agent">{{ agent }}</span>
               </div>
             </div>
           </div>
 
-          <p class="modal-desc">{{ selected.description || "No description available." }}</p>
+          <p class="modal-desc">{{ skillsStore.selectedSkill.description || "No description available." }}</p>
 
           <div class="modal-section">
             <span class="modal-label">SKILL.MD</span>
-            <pre class="modal-content">{{ selected.content }}</pre>
+            <pre class="modal-content">{{ skillsStore.selectedSkill.content }}</pre>
           </div>
 
           <div class="modal-nav">
@@ -143,41 +143,28 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { invoke } from "@tauri-apps/api/core";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import ViewHero from "@/components/layout/ViewHero.vue";
 import GlassCard from "@/components/ui/GlassCard.vue";
 import NeonButton from "@/components/ui/NeonButton.vue";
+import { useSkillsStore } from "@/stores/useSkillsStore";
+import type { SkillInfo } from "@/interfaces";
 
-interface SkillInfo {
-  id: string;
-  name: string;
-  version: string;
-  description: string;
-  category: string;
-  agents: string[];
-  content: string;
-  folder: string;
-}
-
-const skills = ref<SkillInfo[]>([]);
-const loading = ref(false);
-const error = ref<string | null>(null);
 const search = ref("");
-const selected = ref<SkillInfo | null>(null);
 const activeCategory = ref<string | null>(null);
 const activeAgent = ref<string | null>(null);
+const skillsStore = useSkillsStore();
 
 const categories = computed(() =>
-  [...new Set(skills.value.map((skill) => skill.category).filter(Boolean))].sort()
+  [...new Set(skillsStore.skills.map((skill) => skill.category).filter(Boolean))].sort()
 );
 const agents = computed(() =>
-  [...new Set(skills.value.flatMap((skill) => skill.agents).filter(Boolean))].sort()
+  [...new Set(skillsStore.skills.flatMap((skill) => skill.agents).filter(Boolean))].sort()
 );
 
 const filtered = computed(() => {
   const query = search.value.trim().toLowerCase();
-  return skills.value.filter((skill) => {
+  return skillsStore.skills.filter((skill) => {
     if (activeCategory.value && skill.category !== activeCategory.value) return false;
     if (activeAgent.value && !skill.agents.includes(activeAgent.value)) return false;
     if (!query) return true;
@@ -196,40 +183,29 @@ const filtered = computed(() => {
 });
 
 const selectedIndex = computed(() =>
-  selected.value ? filtered.value.findIndex((skill) => skill.id === selected.value?.id) : -1
+  skillsStore.selectedSkill ? filtered.value.findIndex((skill) => skill.id === skillsStore.selectedSkill?.id) : -1
 );
 
 async function load() {
-  loading.value = true;
-  error.value = null;
-  try {
-    skills.value = await invoke<SkillInfo[]>("list_skills");
-    if (selected.value) {
-      selected.value = skills.value.find((skill) => skill.id === selected.value?.id) ?? null;
-    }
-  } catch (e) {
-    error.value = String(e);
-  } finally {
-    loading.value = false;
-  }
+  await skillsStore.loadSkills(true);
 }
 
 function openSkill(skill: SkillInfo) {
-  selected.value = skill;
+  skillsStore.selectSkill(skill.id);
 }
 
 function moveSelection(delta: number) {
   if (selectedIndex.value === -1) return;
   const next = filtered.value[selectedIndex.value + delta];
   if (next) {
-    selected.value = next;
+    skillsStore.selectSkill(next.id);
   }
 }
 
 function handleKeydown(event: KeyboardEvent) {
-  if (!selected.value) return;
+  if (!skillsStore.selectedSkill) return;
   if (event.key === "Escape") {
-    selected.value = null;
+    skillsStore.selectSkill(null);
   } else if (event.key === "ArrowRight" || event.key.toLowerCase() === "j") {
     moveSelection(1);
   } else if (event.key === "ArrowLeft" || event.key.toLowerCase() === "k") {
@@ -239,12 +215,21 @@ function handleKeydown(event: KeyboardEvent) {
 
 onMounted(() => {
   window.addEventListener("keydown", handleKeydown);
-  load();
+  void skillsStore.loadSkills();
 });
 
 onBeforeUnmount(() => {
   window.removeEventListener("keydown", handleKeydown);
 });
+
+watch(
+  () => skillsStore.selectedSkillId,
+  (id) => {
+    if (id && !skillsStore.skills.some((skill) => skill.id === id)) {
+      skillsStore.selectSkill(null);
+    }
+  }
+);
 </script>
 
 <style scoped>
@@ -311,11 +296,11 @@ onBeforeUnmount(() => {
 
 .filter-pill,
 .skill-chip {
-  border: 1px solid var(--glass-border);
-  background: transparent;
+  border: none;
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-surface));
   color: var(--text-muted);
   border-radius: 999px;
-  padding: 3px 9px;
+  padding: 4px 9px;
   font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -323,18 +308,18 @@ onBeforeUnmount(() => {
 
 .filter-pill {
   cursor: pointer;
-  transition: all 0.12s;
+  transition: color 0.12s, background 0.12s;
 }
 
 .filter-pill:hover,
 .filter-pill.active {
-  border-color: var(--accent);
   color: var(--accent);
-  background: var(--accent-dim);
+  background: color-mix(in srgb, var(--accent) 14%, var(--bg-surface));
 }
 
 .skill-chip.agent {
-  color: var(--accent-secondary);
+  color: var(--accent);
+  background: var(--accent-dim);
 }
 
 .loading,

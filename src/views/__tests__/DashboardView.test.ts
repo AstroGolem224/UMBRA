@@ -143,17 +143,22 @@ describe("DashboardView", () => {
     );
   });
 
-  it("renders attention rail, next best move and automation pulse", async () => {
+  it("renders the stitch-inspired dashboard layout and task volume chart", async () => {
     const wrapper = mount(DashboardView);
     await flushPromises();
 
-    expect(wrapper.text()).toContain("attention rail");
-    expect(wrapper.text()).toContain("assignment broker");
-    expect(wrapper.text()).toContain("automation pulse");
+    expect(wrapper.text()).toContain("Umbra Dashboard Overview");
+    expect(wrapper.text()).toContain("Total Tasks");
+    expect(wrapper.text()).toContain("Deployment Registry");
+    expect(wrapper.text()).toContain("Priority Signals");
     expect(wrapper.text()).toContain("build release digest");
     expect(wrapper.text()).toContain("Forge");
     expect(wrapper.text()).toContain("daily build");
     expect(wrapper.text()).toContain("digest failed");
+    expect(wrapper.text()).toContain("In Progress");
+    expect(wrapper.text()).toContain("Completed");
+    expect(wrapper.text()).toContain("Overdue");
+    expect(wrapper.find('[aria-label="task volume chart"]').exists()).toBe(true);
   });
 
   it("cycles the hero theme pill", async () => {

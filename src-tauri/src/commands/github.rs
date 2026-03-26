@@ -1,24 +1,27 @@
 use std::time::{Duration, Instant};
 use tauri::State;
 
+use crate::errors::AppError;
 use crate::state::AppState;
 
 const CACHE_TTL: Duration = Duration::from_secs(300);
 const GITHUB_API: &str = "https://api.github.com";
 
-fn user_repos_url(pat: Option<&str>) -> Result<String, String> {
+fn user_repos_url(pat: Option<&str>) -> Result<String, AppError> {
     match pat.map(str::trim).filter(|token| !token.is_empty()) {
         Some(_) => Ok(format!(
             "{}/user/repos?per_page=100&sort=updated&affiliation=owner",
             GITHUB_API
         )),
-        None => Err("GitHub PAT required to list account repositories. Add one in Settings.".into()),
+        None => {
+            Err(AppError::Other("GitHub PAT required to list account repositories. Add one in Settings.".into()))
+        }
     }
 }
 
 /// Fetch all repos owned by the authenticated user.
 #[tauri::command]
-pub async fn list_user_repos(state: State<'_, AppState>) -> Result<Vec<serde_json::Value>, String> {
+pub async fn list_user_repos(state: State<'_, AppState>) -> Result<Vec<serde_json::Value>, AppError> {
     let pat = {
         let cfg = state.config.read().await;
         cfg.github_pat.clone()
@@ -27,8 +30,7 @@ pub async fn list_user_repos(state: State<'_, AppState>) -> Result<Vec<serde_jso
     let client = reqwest::Client::builder()
         .user_agent("UMBRA/1.0")
         .timeout(Duration::from_secs(10))
-        .build()
-        .map_err(|e| e.to_string())?;
+        .build()?;
 
     let url = user_repos_url(pat.as_deref())?;
 
@@ -39,8 +41,8 @@ pub async fn list_user_repos(state: State<'_, AppState>) -> Result<Vec<serde_jso
         }
     }
 
-    let resp = req.send().await.map_err(|e| e.to_string())?;
-    let repos: Vec<serde_json::Value> = resp.json().await.map_err(|e| e.to_string())?;
+    let resp = req.send().await?;
+    let repos: Vec<serde_json::Value> = resp.json().await?;
 
     // Return minimal shape: name, full_name, html_url, private, description, pushed_at
     let slim: Vec<serde_json::Value> = repos
@@ -61,7 +63,7 @@ pub async fn list_user_repos(state: State<'_, AppState>) -> Result<Vec<serde_jso
 }
 
 #[tauri::command]
-pub async fn get_github_repos(state: State<'_, AppState>) -> Result<serde_json::Value, String> {
+pub async fn get_github_repos(state: State<'_, AppState>) -> Result<serde_json::Value, AppError> {
     // Check cache
     {
         let cache = state.github_cache.lock().await;
@@ -83,8 +85,7 @@ pub async fn get_github_repos(state: State<'_, AppState>) -> Result<serde_json::
 
     let client = reqwest::Client::builder()
         .user_agent("UMBRA/1.0")
-        .build()
-        .map_err(|e| e.to_string())?;
+        .build()?;
 
     let mut repos: Vec<serde_json::Value> = Vec::new();
 
@@ -154,7 +155,7 @@ mod tests {
     #[test]
     fn user_repo_listing_requires_pat() {
         let err = user_repos_url(None).unwrap_err();
-        assert!(err.contains("GitHub PAT required"));
+        assert!(err.to_string().contains("GitHub PAT required"));
     }
 
     #[test]

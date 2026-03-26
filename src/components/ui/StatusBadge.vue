@@ -19,10 +19,10 @@ defineProps<{
   font-family: var(--font-mono);
   font-size: 10px;
   letter-spacing: 0.1em;
-  padding: 4px 8px;
+  padding: 4px 9px;
   border-radius: var(--radius-pill);
   text-transform: uppercase;
-  border: 1px solid transparent;
+  border: none;
 }
 
 .status-badge::before {
@@ -34,31 +34,28 @@ defineProps<{
 }
 
 .online {
-  color: var(--accent-success);
-  background: rgba(0, 245, 100, 0.08);
-  border: 1px solid var(--accent-success);
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.12);
 }
 .online::before {
-  background: var(--accent-success);
-  box-shadow: 0 0 4px var(--accent-success);
+  background: #22c55e;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.5);
   animation: pulse-dot 2s ease-in-out infinite;
 }
 
 .working {
   color: #f59e0b;
-  background: rgba(245, 158, 11, 0.08);
-  border: 1px solid #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
 }
 .working::before {
   background: #f59e0b;
-  box-shadow: 0 0 4px #f59e0b;
+  box-shadow: 0 0 6px rgba(245, 158, 11, 0.5);
   animation: spin-dot 1.2s linear infinite;
 }
 
 .idle {
   color: var(--accent);
   background: var(--accent-dim);
-  border: 1px solid var(--accent);
 }
 .idle::before {
   background: var(--accent);
@@ -66,17 +63,16 @@ defineProps<{
 
 .offline {
   color: var(--text-muted);
-  background: var(--bg-surface);
-  border: 1px solid var(--glass-border);
+  background: color-mix(in srgb, var(--bg-surface) 80%, transparent);
 }
 .offline::before {
   background: var(--text-muted);
+  opacity: 0.5;
 }
 
 .error {
   color: var(--accent-error);
-  background: rgba(255, 50, 50, 0.08);
-  border: 1px solid var(--accent-error);
+  background: rgba(239, 68, 68, 0.10);
 }
 .error::before {
   background: var(--accent-error);
@@ -84,32 +80,27 @@ defineProps<{
 
 :global([data-theme="light"]) .online {
   color: #166534;
-  background: rgba(220, 252, 231, 0.96);
-  border-color: rgba(22, 101, 52, 0.16);
+  background: rgba(220, 252, 231, 0.8);
 }
 
 :global([data-theme="light"]) .working {
   color: #b45309;
-  background: rgba(255, 247, 237, 0.96);
-  border-color: rgba(180, 83, 9, 0.18);
+  background: rgba(255, 247, 237, 0.8);
 }
 
 :global([data-theme="light"]) .idle {
-  color: #0f766e;
-  background: rgba(240, 253, 250, 0.96);
-  border-color: rgba(15, 118, 110, 0.16);
+  color: #0e7490;
+  background: rgba(207, 250, 254, 0.6);
 }
 
 :global([data-theme="light"]) .offline {
-  color: rgba(15, 23, 42, 0.72);
-  background: rgba(248, 250, 252, 0.98);
-  border-color: rgba(15, 23, 42, 0.12);
+  color: #6e7881;
+  background: rgba(241, 245, 249, 0.8);
 }
 
 :global([data-theme="light"]) .error {
   color: #b91c1c;
-  background: rgba(254, 226, 226, 0.96);
-  border-color: rgba(185, 28, 28, 0.16);
+  background: rgba(254, 226, 226, 0.8);
 }
 
 @keyframes pulse-dot {
