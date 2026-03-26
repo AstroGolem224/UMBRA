@@ -33,7 +33,7 @@
 
           <template v-if="step === 1">
             <label class="step-label">pm tool url</label>
-            <p class="step-hint">the base API URL for the project management tool. leave empty if you don't use one.</p>
+            <p class="step-hint">the base URL of the project management tool (without <code>/api</code>). leave empty if you don't use one.</p>
             <input v-model="pmToolUrl" class="glass-input step-input" type="text" placeholder="http://100.115.61.30:8000" />
             <div v-if="pmTestResult" class="test-result" :class="pmTestResult.ok ? 'ok' : 'fail'">
               {{ pmTestResult.message }}
@@ -115,13 +115,26 @@ async function pickFolder(target: "vault" | "repo") {
 async function testPmConnection() {
   pmTesting.value = true;
   pmTestResult.value = null;
+  const url = pmToolUrl.value.trim().replace(/\/+$/, "").replace(/\/api$/i, "");
+  if (!url) { pmTesting.value = false; return; }
   try {
-    const resp = await fetch("/pm-api/projects");
-    if (resp.ok) {
-      const data = await resp.json();
-      pmTestResult.value = { ok: true, message: `connected. ${data.length} projects found.` };
+    const isTauri = Boolean((window as any).__TAURI_INTERNALS__);
+    if (isTauri) {
+      // Save the URL first so Rust backend knows where to connect
+      await configStore.saveConfig({ ...configStore.config, pmToolUrl: url });
+      const { invoke } = await import("@tauri-apps/api/core");
+      const data = await invoke<unknown[]>("get_pm_projects");
+      const count = Array.isArray(data) ? data.length : 0;
+      pmTestResult.value = { ok: true, message: `connected. ${count} projects found.` };
     } else {
-      pmTestResult.value = { ok: false, message: `server responded with ${resp.status}` };
+      // Browser dev mode — use Vite proxy
+      const resp = await fetch("/pm-api/projects");
+      if (resp.ok) {
+        const data = await resp.json();
+        pmTestResult.value = { ok: true, message: `connected. ${data.length} projects found.` };
+      } else {
+        pmTestResult.value = { ok: false, message: `server responded with ${resp.status}` };
+      }
     }
   } catch (e) {
     pmTestResult.value = { ok: false, message: `connection failed: ${String(e).slice(0, 80)}` };
@@ -142,7 +155,7 @@ async function finish() {
     const updates = {
       ...configStore.config,
       vaultPath: vaultPath.value.trim(),
-      pmToolUrl: pmToolUrl.value.trim().replace(/\/+$/, ""),
+      pmToolUrl: pmToolUrl.value.trim().replace(/\/+$/, "").replace(/\/api$/i, ""),
       repoRootPath: repoRootPath.value.trim(),
     };
     if (githubPat.value.trim()) {
